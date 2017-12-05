@@ -9,7 +9,7 @@ Always on top window preview similar to the popular windows only OnTopReplica
 
 **To do:**
 * Multiple preview from same process
-* Almost all the features missing when comapred to [OnTopReplica](https://github.com/LorenzCK/OnTopReplica)
+* Almost all the missing features when comapred to [OnTopReplica](https://github.com/LorenzCK/OnTopReplica)
 
 **Build and run:**
 ~~~
