@@ -18,7 +18,6 @@
     window = [[NSWindow alloc] initWithContentRect:rect styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
     
     [window setMovable:YES];
-    //    [window setAlphaValue:0.5];
     [window setShowsResizeIndicator:NO];
     [window setMinSize:NSMakeSize(100, 100)];
     [window setLevel: NSFloatingWindowLevel];
@@ -56,21 +55,37 @@
 }
 
 - (void)rightMouseDown:(NSEvent *)theEvent { 
-    int layer = -1;
-    int index = 0;
+    int layer = -1, index = 0;
     uint32_t windowId = 0;
-    NSMenu *theMenu = [[NSMenu alloc] initWithTitle:@"Contextual Menu"];
+    NSMenu *theMenu = [[NSMenu alloc] init];
+    [theMenu setMinimumWidth:100];
     CFArrayRef all_windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
+
+    NSSlider* slider = [[NSSlider alloc] init];
+
+    [slider setMinValue:0.1];
+    [slider setMaxValue:1.0];
+    [slider setDoubleValue:window.alphaValue];
+    [slider setFrame:NSMakeRect(0, 0, 200, 30)];
+    slider.autoresizingMask = NSViewWidthSizable;
+    [slider setTarget:self];
+    [slider setAction:@selector(adjustOpacity:)];
     
+    NSMenuItem* itemSlider = [[NSMenuItem alloc] init];
+    [itemSlider setEnabled:YES];
+    [itemSlider setView:slider];
+
+    [theMenu addItem:itemSlider];
+    [theMenu addItem:[NSMenuItem separatorItem]];
+
     for (CFIndex i = 0; i < CFArrayGetCount(all_windows); ++i) {
         CFDictionaryRef window_ref = (CFDictionaryRef)CFArrayGetValueAtIndex(all_windows, i);
         CFNumberRef id_ref = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowNumber);
-        CFNumberRef window_layer = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowLayer);
         CFStringRef name_ref = (CFStringRef)CFDictionaryGetValue(window_ref, kCGWindowName);
         CFStringRef owner_ref = (CFStringRef)CFDictionaryGetValue(window_ref, kCGWindowOwnerName);
-        
-        
+        CFNumberRef window_layer = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowLayer);
         CFDictionaryRef bounds = (CFDictionaryRef)CFDictionaryGetValue (window_ref, kCGWindowBounds);
+
         if(bounds){
             CGRect rect;
             CGRectMakeWithDictionaryRepresentation(bounds, &rect);
@@ -96,30 +111,36 @@
         
         if(name) CFRelease(name);
         
-        NSMenuItem* item = [theMenu insertItemWithTitle:windowTitle action:@selector(changeWindow:) keyEquivalent:@"" atIndex:index];
+        NSMenuItem* item = [theMenu addItemWithTitle:windowTitle action:@selector(changeWindow:) keyEquivalent:@""];
         [item setTarget:self];
         [item setTag:windowId];
         index += 1;
     }
+
+    [theMenu addItem:[NSMenuItem separatorItem]];
+
     if(window_id != 0){
-        NSMenuItem* item = [theMenu insertItemWithTitle:@"pause" action:@selector(changeWindow:) keyEquivalent:@"" atIndex:index];
+        NSMenuItem* item = [theMenu addItemWithTitle:@"pause" action:@selector(changeWindow:) keyEquivalent:@""];
         [item setTag:0];
         [item setTarget:self];
-        index += 1;
     }
     
     if(selectionView.selection.size.width == 0 && window_id != 0){
-        NSMenuItem* item = [theMenu insertItemWithTitle:@"selct region" action:@selector(selectRegion:) keyEquivalent:@"" atIndex:index];
+        NSMenuItem* item = [theMenu addItemWithTitle:@"selct region" action:@selector(selectRegion:) keyEquivalent:@""];
         [item setTarget:self];
     }
 
-//    NSMenuItem* item = [theMenu insertItemWithTitle:@"close" action:@selector(close:) keyEquivalent:@"" atIndex:index];
+//    NSMenuItem* item = [theMenu addItemWithTitle:@"close" action:@selector(close:) keyEquivalent:@""];
 //    [item setTarget:self];
-//    index += 1;
     
     CFRelease(all_windows);
     
     [NSMenu popUpContextMenu:theMenu withEvent:theEvent forView:glView];
+}
+
+- (void)adjustOpacity:(id)sender{
+    NSSlider* slider = (NSSlider*)sender;
+    [window setAlphaValue:slider.doubleValue];
 }
 
 - (void)changeWindow:(id)sender{

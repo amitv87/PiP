@@ -239,4 +239,12 @@
     [rightCLickDelegate rightMouseDown:theEvent];
 }
 
+- (void)handleGesture:(NSGestureRecognizer *)gestureRecognizer{
+    NSLog(@"handleGesture %@", gestureRecognizer);
+}
+
+- (void)magnifyWithEvent:(NSEvent *)event{
+    NSLog(@"magnifyWithEvent %@", event);
+}
+
 @end
