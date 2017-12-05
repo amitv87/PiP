@@ -228,7 +228,7 @@
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    [myCIcontext drawImage: myCIImage inRect: imageRect  fromRect: imageRect];
+    [myCIcontext drawImage: myCIImage atPoint: CGPointZero  fromRect: imageRect];
 
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
     
