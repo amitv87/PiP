@@ -13,7 +13,7 @@ Always on top window preview similar to the popular windows only OnTopReplica
 
 **Build and run:**
 ~~~
-git clone https://github.com/amitv87/pip.git
+git clone https://github.com/amitv87/PiP.git
 cd pip
 xcodebuild
 ./build/Release/pip
