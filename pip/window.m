@@ -130,8 +130,8 @@
         [item setTarget:self];
     }
 
-//    NSMenuItem* item = [theMenu addItemWithTitle:@"close" action:@selector(close:) keyEquivalent:@""];
-//    [item setTarget:self];
+    NSMenuItem* item = [theMenu addItemWithTitle:@"close" action:@selector(close:) keyEquivalent:@""];
+    [item setTarget:self];
     
     CFRelease(all_windows);
     

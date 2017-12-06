@@ -23,7 +23,7 @@
     id appName = [[NSProcessInfo processInfo] processName];
     
     // todo: multiple windows
-//    [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"New Capture" action:@selector(newWindow) keyEquivalent:@"n"]];
+    [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"New Capture" action:@selector(newWindow) keyEquivalent:@"n"]];
     [appMenu addItem:[[NSMenuItem alloc] initWithTitle:[@"Quit " stringByAppendingString:appName] action:@selector(terminate:) keyEquivalent:@"q"]];
     
     id appMenuItem = [NSMenuItem new];

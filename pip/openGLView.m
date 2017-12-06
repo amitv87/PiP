@@ -210,6 +210,8 @@
     
     imageAspectRatio = imageRect.size.width / imageRect.size.height;
 
+    [[self openGLContext] makeCurrentContext];
+
     [self setFBO];
 
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, FBOid);
