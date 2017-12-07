@@ -12,9 +12,8 @@
 #import "openGLView.h"
 #import "selectionView.h"
 
-@interface Window : NSObject<NSWindowDelegate, NSApplicationDelegate, RightCLickDelegate>{
+@interface Window : NSWindow<NSWindowDelegate, RightCLickDelegate>{
     NSTimer* timer;
-    NSWindow* window;
     CGWindowID window_id;
     OpenGLView* glView;
     SelectionView* selectionView;

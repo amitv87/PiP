@@ -10,7 +10,6 @@
 @interface OpenGLView : NSOpenGLView{
     GLuint FBOid;
     CGRect imageRect;
-    CIImage *myCIImage;
     BOOL alreadyCropped;
     GLuint FBOTextureId;
     CIContext *myCIcontext;

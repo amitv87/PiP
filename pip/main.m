@@ -8,6 +8,8 @@
 
 #import "window.h"
 
+NSWindow* currentWindow = NULL;
+
 @interface MyApplicationDelegate : NSObject <NSApplicationDelegate> {
     NSApplication* app;
 }
@@ -24,6 +26,7 @@
     
     // todo: multiple windows
     [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"New Capture" action:@selector(newWindow) keyEquivalent:@"n"]];
+    [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"Close Window" action:@selector(closeWindow) keyEquivalent:@"w"]];
     [appMenu addItem:[[NSMenuItem alloc] initWithTitle:[@"Quit " stringByAppendingString:appName] action:@selector(terminate:) keyEquivalent:@"q"]];
     
     id appMenuItem = [NSMenuItem new];
@@ -40,6 +43,14 @@
 
 - (void) run{
     [app run];
+}
+
+- (void) closeWindow{
+    if(currentWindow){
+        NSWindow* cWindow = currentWindow;
+        currentWindow = NULL;
+        [cWindow close];
+    }
 }
 
 - (void) newWindow{

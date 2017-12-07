@@ -8,34 +8,41 @@
 
 #import "window.h"
 
+extern NSWindow* currentWindow;
+
 @implementation Window
 
 - (id) init{
-    self = [super init];
     timer = NULL;
     window_id = 0;
     NSRect rect = NSMakeRect(0, 0, 640, 360);
-    window = [[NSWindow alloc] initWithContentRect:rect styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
+    self = [super initWithContentRect:rect styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
     
-    [window setMovable:YES];
-    [window setShowsResizeIndicator:NO];
-    [window setMinSize:NSMakeSize(100, 100)];
-    [window setLevel: NSFloatingWindowLevel];
-    [window setStyleMask:NSWindowStyleMaskTexturedBackground | NSWindowStyleMaskResizable];
+    [self setMovable:YES];
+    [self setShowsResizeIndicator:NO];
+    [self setMinSize:NSMakeSize(100, 100)];
+    [self setLevel: NSFloatingWindowLevel];
+    [self setStyleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskTexturedBackground | NSWindowStyleMaskResizable];
 
     glView = [[OpenGLView alloc] initWithFrame:rect rightCLickDelegate:self];
     [glView setWantsLayer: YES];
     [glView.layer setCornerRadius: 5];
-    [window setContentView:glView];
-    
-    [window setOpaque:NO];
-    
-    [window makeKeyAndOrderFront:self];
-    [window setMovableByWindowBackground:YES];
+    [self setContentView:glView];
+
+    [self setDelegate:self];
+    [self setReleasedWhenClosed:NO];
+    [self makeKeyAndOrderFront:self];
+    [self setMovableByWindowBackground:YES];
+    [self setRestorable:NO];
+    [self setWindowController:NULL];
     
     selectionView = [[SelectionView alloc] init];
     selectionView.selection = NSMakeRect(0,0,0,0);
     return self;
+}
+
+- (BOOL) canBecomeKeyWindow{
+    return YES;
 }
 
 - (void) start{
@@ -65,7 +72,7 @@
 
     [slider setMinValue:0.1];
     [slider setMaxValue:1.0];
-    [slider setDoubleValue:window.alphaValue];
+    [slider setDoubleValue:self.alphaValue];
     [slider setFrame:NSMakeRect(0, 0, 200, 30)];
     slider.autoresizingMask = NSViewWidthSizable;
     [slider setTarget:self];
@@ -130,7 +137,7 @@
         [item setTarget:self];
     }
 
-    NSMenuItem* item = [theMenu addItemWithTitle:@"close" action:@selector(close:) keyEquivalent:@""];
+    NSMenuItem* item = [theMenu addItemWithTitle:@"close" action:@selector(close) keyEquivalent:@""];
     [item setTarget:self];
     
     CFRelease(all_windows);
@@ -140,7 +147,7 @@
 
 - (void)adjustOpacity:(id)sender{
     NSSlider* slider = (NSSlider*)sender;
-    [window setAlphaValue:slider.doubleValue];
+    [self setAlphaValue:slider.doubleValue];
 }
 
 - (void)changeWindow:(id)sender{
@@ -149,15 +156,23 @@
 }
 
 - (void)selectRegion:(id)sender{
-    [window setMovable:NO];
+    [self setMovable:NO];
     [selectionView setFrameSize:NSMakeSize(glView.bounds.size.width, glView.bounds.size.height)];
-    [window.contentView addSubview:selectionView];
+    [self.contentView addSubview:selectionView];
     [[NSCursor crosshairCursor] set];
 }
 
-- (void)close:(id)sender{
-    [timer invalidate];
-    [window close];
+- (void)windowDidBecomeKey:(NSNotification *)notification{
+    currentWindow = self;
+}
+
+- (void)close{
+    window_id = 0;
+    if(timer) [timer invalidate];
+    glView = NULL;
+    selectionView = NULL;
+    [self setContentView:NULL];
+    [super close];
 }
 
 @end

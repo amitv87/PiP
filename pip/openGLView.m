@@ -193,7 +193,7 @@
 }
 
 - (void) drawImage: (CGImageRef) cgimage withRect:(CGRect) rect{
-    myCIImage = [CIImage imageWithCGImage:cgimage];
+    CIImage* myCIImage = [CIImage imageWithCGImage:cgimage];
     
     CGRect imgRect = [myCIImage extent];
 
