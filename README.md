@@ -6,9 +6,9 @@ Always on top window preview similar to the popular windows only OnTopReplica
 * Clone any visibile window
 * Crop the preview
 * Auto and manual resize preserving the aspect ratio
+* Multiple window preview from same process, cmd+n to open and cmd+w to close
 
 **To do:**
-* Multiple preview from same process
 * Almost all the missing features when comapred to [OnTopReplica](https://github.com/LorenzCK/OnTopReplica)
 
 **Build and run:**
