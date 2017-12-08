@@ -7,6 +7,7 @@ Always on top window preview similar to the popular windows only OnTopReplica
 * Crop the preview
 * Auto and manual resize preserving the aspect ratio
 * Multiple window preview from same process, cmd+n to open and cmd+w to close
+* Pinch to zoom
 
 **To do:**
 * Almost all the missing features when comapred to [OnTopReplica](https://github.com/LorenzCK/OnTopReplica)
