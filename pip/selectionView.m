@@ -12,6 +12,8 @@
 
 #pragma mark Mouse Events
 
+#define NSColorFromRGB(rgbValue) [NSColor colorWithCalibratedRed:((float)((rgbValue & 0xFF000000) >> 16))/255.0 green:((float)((rgbValue & 0xFF0000) >> 8))/255.0 blue:((float)(rgbValue & 0xFF00))/255.0 alpha:((float)(rgbValue & 0xFF))/255.0]
+
 - (void)mouseDown:(NSEvent *)theEvent
 {
     self.startPoint = [self convertPoint:[theEvent locationInWindow] fromView:nil];
@@ -20,9 +22,12 @@
     
     self.shapeLayer = [CAShapeLayer layer];
     self.shapeLayer.lineWidth = 1.0;
-    self.shapeLayer.strokeColor = [[NSColor blackColor] CGColor];
-    self.shapeLayer.fillColor = [[NSColor clearColor] CGColor];
-    self.shapeLayer.lineDashPattern = @[@10, @5];
+    self.shapeLayer.shadowOpacity = 0.5;
+
+    self.shapeLayer.strokeColor = [[NSColor grayColor] CGColor];
+    self.shapeLayer.fillColor = [NSColorFromRGB(0x00000044) CGColor];
+    self.shapeLayer.shadowColor = [[NSColor whiteColor] CGColor];
+    self.shapeLayer.lineDashPattern = @[@10, @10];
     [self.layer addSublayer:self.shapeLayer];
     
     // create animation for the layer

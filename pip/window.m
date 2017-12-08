@@ -15,7 +15,7 @@ extern NSWindow* currentWindow;
 - (id) init{
     timer = NULL;
     window_id = 0;
-    NSRect rect = NSMakeRect(0, 0, 640, 360);
+    NSRect rect = NSMakeRect(0, 0, 400, 400);
     self = [super initWithContentRect:rect styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
     
     [self setMovable:YES];
@@ -47,7 +47,8 @@ extern NSWindow* currentWindow;
 
 - (void) start{
     if(timer != NULL) return;
-    timer = [NSTimer scheduledTimerWithTimeInterval:0.03f target:self selector:@selector(captrue:) userInfo:nil repeats:YES];
+    timer = [NSTimer timerWithTimeInterval:0.03f target:self selector:@selector(captrue:) userInfo:nil repeats:YES];
+    [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
 }
 
 - (void)captrue:(NSTimer *)timer{
@@ -130,6 +131,9 @@ extern NSWindow* currentWindow;
         NSMenuItem* item = [theMenu addItemWithTitle:@"pause" action:@selector(changeWindow:) keyEquivalent:@""];
         [item setTag:0];
         [item setTarget:self];
+
+        NSMenuItem* item2 = [theMenu addItemWithTitle:@"1X" action:@selector(set1x) keyEquivalent:@""];
+        [item2 setTarget:self];
     }
     
     if(selectionView.selection.size.width == 0 && window_id != 0){
@@ -137,12 +141,16 @@ extern NSWindow* currentWindow;
         [item setTarget:self];
     }
 
-    NSMenuItem* item = [theMenu addItemWithTitle:@"close" action:@selector(close) keyEquivalent:@""];
+    NSMenuItem* item = [theMenu addItemWithTitle:@"close" action:@selector(close) keyEquivalent:@"w"];
     [item setTarget:self];
     
     CFRelease(all_windows);
     
     [NSMenu popUpContextMenu:theMenu withEvent:theEvent forView:glView];
+}
+
+- (void)set1x{
+    [glView resizeTo1x];
 }
 
 - (void)adjustOpacity:(id)sender{

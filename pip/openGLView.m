@@ -141,14 +141,23 @@
 
 - (void) renderScene{
     if(!imageAspectRatio) return;
-    NSRect bounds = [self bounds];
-    float screenAspectRatio = bounds.size.width / bounds.size.height;
-    float arr = imageAspectRatio / screenAspectRatio;
-    
-    if( 0.99 > arr || arr > 1.01){
-//        NSLog(@"set ar");
-        [self.window setContentSize:NSMakeSize(bounds.size.width, bounds.size.width / imageAspectRatio)];
+
+    NSRect bounds;
+
+    if(set1x){
+        set1x = false;
+        bounds = imageRect;
+        [self.window setContentSize:imageRect.size];
         [self.window setAspectRatio:imageRect.size];
+    }
+    else{
+        bounds = [self bounds];
+        float screenAspectRatio = bounds.size.width / bounds.size.height;
+        float arr = imageAspectRatio / screenAspectRatio;
+        if( 0.99 > arr || arr > 1.01){
+            [self.window setContentSize:NSMakeSize(bounds.size.width, bounds.size.width / imageAspectRatio)];
+            [self.window setAspectRatio:imageRect.size];
+        }
     }
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -237,16 +246,27 @@
     [self setNeedsDisplay:YES];
 }
 
+- (void) resizeTo1x{
+    set1x = true;
+}
+
 - (void)rightMouseDown:(NSEvent *)theEvent {
     [rightCLickDelegate rightMouseDown:theEvent];
 }
 
-- (void)handleGesture:(NSGestureRecognizer *)gestureRecognizer{
-    NSLog(@"handleGesture %@", gestureRecognizer);
-}
-
 - (void)magnifyWithEvent:(NSEvent *)event{
-    NSLog(@"magnifyWithEvent %@", event);
+    NSRect bounds = [self bounds];
+    NSRect windowBounds = [[[self window] screen] visibleFrame];
+
+    float factor = [event magnification];
+    float width = bounds.size.width + (bounds.size.width * factor);
+    float height = bounds.size.height + (bounds.size.height * factor);
+    if(windowBounds.size.width < width || windowBounds.size.height < height || width < 100 || height < 100) return;
+
+    NSRect windowRect = [[self window] frame];
+    windowRect.size.width = width;
+    windowRect.size.height = height;
+    [self.window setFrame:windowRect display:YES];
 }
 
 @end

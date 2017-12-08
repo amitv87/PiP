@@ -10,6 +10,7 @@
 @interface OpenGLView : NSOpenGLView{
     GLuint FBOid;
     CGRect imageRect;
+    BOOL set1x;
     BOOL alreadyCropped;
     GLuint FBOTextureId;
     CIContext *myCIcontext;
@@ -18,6 +19,7 @@
     id<RightCLickDelegate> rightCLickDelegate;
 }
 - (id)initWithFrame:(NSRect)frameRect rightCLickDelegate:(id<RightCLickDelegate>) delegate;
+- (void) resizeTo1x;
 - (void) drawRect: (NSRect) bounds;
 - (void) drawImage: (CGImageRef) cgimage withRect:(CGRect) rect;
 @end

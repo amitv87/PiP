@@ -12,6 +12,7 @@ NSWindow* currentWindow = NULL;
 
 @interface MyApplicationDelegate : NSObject <NSApplicationDelegate> {
     NSApplication* app;
+    NSMenuItem* closeItem;
 }
 @end
 
@@ -25,8 +26,11 @@ NSWindow* currentWindow = NULL;
     id appName = [[NSProcessInfo processInfo] processName];
     
     // todo: multiple windows
-    [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"New Capture" action:@selector(newWindow) keyEquivalent:@"n"]];
-    [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"Close Window" action:@selector(closeWindow) keyEquivalent:@"w"]];
+    [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"New" action:@selector(newWindow) keyEquivalent:@"n"]];
+    closeItem = [[NSMenuItem alloc] initWithTitle:@"Close Current" action:@selector(closeWindow) keyEquivalent:@"w"];
+    [closeItem setHidden:YES];
+
+    [appMenu addItem:closeItem];
     [appMenu addItem:[[NSMenuItem alloc] initWithTitle:[@"Quit " stringByAppendingString:appName] action:@selector(terminate:) keyEquivalent:@"q"]];
     
     id appMenuItem = [NSMenuItem new];
@@ -46,6 +50,7 @@ NSWindow* currentWindow = NULL;
 }
 
 - (void) closeWindow{
+    if([[app windows] count] == 1) [closeItem setHidden:YES];
     if(currentWindow){
         NSWindow* cWindow = currentWindow;
         currentWindow = NULL;
@@ -55,6 +60,7 @@ NSWindow* currentWindow = NULL;
 
 - (void) newWindow{
     [[[Window alloc] init] start];
+    [closeItem setHidden:NO];
 }
 
 -(void)applicationDidFinishLaunching:(NSNotification *)notification{
