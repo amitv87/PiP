@@ -3,6 +3,8 @@
 #import <OpenGL/OpenGL.h>
 #import <QuartzCore/QuartzCore.h>
 
+#import "common.h"
+
 @implementation OpenGLView
 
 - (id)initWithFrame:(NSRect)frameRect rightCLickDelegate:(id<RightCLickDelegate>) delegate{
@@ -12,7 +14,7 @@
         NSOpenGLPFANoRecovery,
         NSOpenGLPFADoubleBuffer,
         NSOpenGLPFAColorSize, 24,
-        NSOpenGLPFAAlphaSize,  8,
+        NSOpenGLPFAAlphaSize, 8,
         NSOpenGLPFAMultisample,
         NSOpenGLPFASampleBuffers, 1,
         NSOpenGLPFASamples, 4,
@@ -23,7 +25,7 @@
         NSOpenGLPFAAccelerated,
         NSOpenGLPFADoubleBuffer,
         NSOpenGLPFAColorSize, 24,
-        NSOpenGLPFAAlphaSize,  8,
+        NSOpenGLPFAAlphaSize, 8,
         0,
     };
     
@@ -51,53 +53,29 @@
     return self;
 }
 
-
-// Create CIContext based on OpenGL context and pixel format
 - (BOOL)createCIContext{
-    
-    
-    // Create CIContext from the OpenGL context.
     myCIcontext = [CIContext contextWithCGLContext:[[self openGLContext] CGLContextObj] pixelFormat:[pixelFormat CGLPixelFormatObj] colorSpace: nil options: nil];
 
     if (!myCIcontext){
         NSLog(@"CIContext creation failed");
         return NO;
     }
-    
-    // Created succesfully
     return YES;
 }
 
-// Create or update the hardware accelerated offscreen area
-// Framebuffer object aka. FBO
 - (void)setFBO{
-    
-    // If not previously setup
-    // generate IDs for FBO and its associated texture
     if (!FBOid){
-        // Make sure the framebuffer extenstion is supported
         const GLubyte* strExt;
         GLboolean isFBO;
-        // Get the extenstion name string.
-        // It is a space-delimited list of the OpenGL extenstions
-        // that are supported by the current renderer
         strExt = glGetString(GL_EXTENSIONS);
         isFBO = gluCheckExtension((const GLubyte*)"GL_EXT_framebuffer_object", strExt);
-        if (!isFBO)
-            NSLog(@"Your system does not support framebuffer extension");
-        
-        // create FBO object
+        if (!isFBO) NSLog(@"Your system does not support framebuffer extension");
         glGenFramebuffersEXT(1, &FBOid);
-        // the texture
         glGenTextures(1, &FBOTextureId);
     }
-    
-    // Bind to FBO
+
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, FBOid);
-    
-    // Sanity check against maximum OpenGL texture size
-    // If bigger adjust to maximum possible size
-    // while maintain the aspect ratio
+
     GLint maxTexSize;
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTexSize);
     if (imageRect.size.width > maxTexSize || imageRect.size.height > maxTexSize){
@@ -110,8 +88,7 @@
             imageRect.size.height = maxTexSize;
         }
     }
-    
-    // Initialize FBO Texture
+
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, FBOTextureId);
 
     glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -120,21 +97,15 @@
     glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     
     glTexImage2D(GL_TEXTURE_RECTANGLE_ARB, 0, GL_RGBA, imageRect.size.width, imageRect.size.height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, NULL);
-    
-    // and attach texture to the FBO as its color destination
+
     glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_RECTANGLE_ARB, FBOTextureId, 0);
  
-    // Make sure the FBO was created succesfully.
-    if (GL_FRAMEBUFFER_COMPLETE_EXT != glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT))
-        NSLog(@"Framebuffer Object creation or update failed!");
-    
-    // unbind FBO
+    if (GL_FRAMEBUFFER_COMPLETE_EXT != glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT)) NSLog(@"Framebuffer Object creation or update failed!");
+
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 }
 
 - (void)prepareOpenGL{
-    glClearColor(255.0f, 255.0f, 255.0f, 255.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
     glEnable(GL_TEXTURE_RECTANGLE_ARB);
     [self createCIContext];
 }
@@ -144,14 +115,16 @@
 
     NSRect bounds;
 
-    if(set1x){
-        set1x = false;
-        bounds = imageRect;
-        [self.window setContentSize:imageRect.size];
-        [self.window setAspectRatio:imageRect.size];
+    if(setScaleOnce){
+        setScaleOnce = false;
+        NSRect windowBounds = [[[self window] screen] visibleFrame];
+        bounds = NSMakeRect(0, 0, imageRect.size.width * scale / 100, imageRect.size.height * scale / 100);
+        if(windowBounds.size.width < bounds.size.width || windowBounds.size.height < bounds.size.height || bounds.size.width < kMinSize || bounds.size.height < kMinSize) goto doNormally;
+        [self.window setContentSize:bounds.size];
+        [self.window setAspectRatio:bounds.size];
     }
     else{
-        bounds = [self bounds];
+    doNormally:bounds = [self bounds];
         float screenAspectRatio = bounds.size.width / bounds.size.height;
         float arr = imageAspectRatio / screenAspectRatio;
         if( 0.99 > arr || arr > 1.01){
@@ -213,8 +186,8 @@
     else if(!alreadyCropped){
         alreadyCropped = true;
         CGRect bounds = [self bounds];
-        float scale = imgRect.size.width / bounds.size.width;
-        imageRect = CGRectMake(rect.origin.x * scale, rect.origin.y * scale, rect.size.width * scale, rect.size.height * scale);
+        float scaleImgToWindow = imgRect.size.width / bounds.size.width;
+        imageRect = CGRectMake(rect.origin.x * scaleImgToWindow, rect.origin.y * scaleImgToWindow, rect.size.width * scaleImgToWindow, rect.size.height * scaleImgToWindow);
     }
     
     imageAspectRatio = imageRect.size.width / imageRect.size.height;
@@ -246,8 +219,9 @@
     [self setNeedsDisplay:YES];
 }
 
-- (void) resizeTo1x{
-    set1x = true;
+- (void) setScale:(NSInteger) _scale{
+    scale = _scale;
+    setScaleOnce = true;
 }
 
 - (void)rightMouseDown:(NSEvent *)theEvent {
@@ -261,7 +235,7 @@
     float factor = [event magnification];
     float width = bounds.size.width + (bounds.size.width * factor);
     float height = bounds.size.height + (bounds.size.height * factor);
-    if(windowBounds.size.width < width || windowBounds.size.height < height || width < 100 || height < 100) return;
+    if(windowBounds.size.width < width || windowBounds.size.height < height || width < kMinSize || height < kMinSize) return;
 
     NSRect windowRect = [[self window] frame];
     windowRect.size.width = width;

@@ -15,12 +15,14 @@
 @interface Window : NSWindow<NSWindowDelegate, RightCLickDelegate>{
     NSTimer* timer;
     CGWindowID window_id;
+    NSView* dummyView;
     OpenGLView* glView;
     SelectionView* selectionView;
 }
 
 - (void) start;
-- (void) rightMouseDown:(NSEvent *)theEvent;
+- (void) setScale:(NSInteger) scale;
+- (void) rightMouseDown:(NSEvent *) theEvent;
 
 @end
 #endif /* Window_h */

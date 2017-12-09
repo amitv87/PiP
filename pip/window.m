@@ -6,38 +6,64 @@
 //  Copyright © 2017 boggyb. All rights reserved.
 //
 
+#import "common.h"
 #import "window.h"
 
-extern NSWindow* currentWindow;
+extern Window* currentWindow;
 
 @implementation Window
 
 - (id) init{
     timer = NULL;
     window_id = 0;
-    NSRect rect = NSMakeRect(0, 0, 400, 400);
-    self = [super initWithContentRect:rect styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
-    
+    NSRect rect = NSMakeRect(0, 0, kStartSize, kStartSize);
+    self = [super initWithContentRect:rect styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskTexturedBackground | NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
+    [self setAspectRatio:rect.size];
+
+    [self center];
     [self setMovable:YES];
     [self setShowsResizeIndicator:NO];
-    [self setMinSize:NSMakeSize(100, 100)];
     [self setLevel: NSFloatingWindowLevel];
-    [self setStyleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskTexturedBackground | NSWindowStyleMaskResizable];
+    [self setMinSize:NSMakeSize(kMinSize, kMinSize)];
+    [self setMaxSize:[[self screen] visibleFrame].size];
 
     glView = [[OpenGLView alloc] initWithFrame:rect rightCLickDelegate:self];
     [glView setWantsLayer: YES];
     [glView.layer setCornerRadius: 5];
+    [glView.layer setMasksToBounds:YES];
     [self setContentView:glView];
 
     [self setDelegate:self];
+    [self setRestorable:NO];
+    [self setWindowController:NULL];
     [self setReleasedWhenClosed:NO];
     [self makeKeyAndOrderFront:self];
     [self setMovableByWindowBackground:YES];
-    [self setRestorable:NO];
-    [self setWindowController:NULL];
-    
+
     selectionView = [[SelectionView alloc] init];
-    selectionView.selection = NSMakeRect(0,0,0,0);
+    selectionView.selection = CGRectZero;
+    selectionView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+
+    dummyView = [[NSView alloc] initWithFrame:rect];
+    dummyView.wantsLayer = YES;
+    dummyView.layer.backgroundColor = [NSColor blackColor].CGColor;
+    dummyView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+
+    NSString* text = @"Right click anywhere on the window";
+    NSTextView* textView = [[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, 250, 0)];
+
+    [textView setFrameOrigin:NSMakePoint((NSWidth([dummyView bounds]) - NSWidth([textView frame])) / 2, (NSHeight([dummyView bounds]) - NSHeight([textView frame])) / 2)];
+
+    [textView setString:text];
+    [textView setEditable:NO];
+    [textView setSelectable:NO];
+    [textView setTextColor:[NSColor whiteColor]];
+    [textView setAlignment:NSTextAlignmentCenter];
+    [textView setBackgroundColor:[NSColor blackColor]];
+    [textView setAutoresizingMask: NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin];
+    [dummyView addSubview: textView];
+
+    [self.contentView setSubviews:@[dummyView]];
     return self;
 }
 
@@ -79,10 +105,20 @@ extern NSWindow* currentWindow;
     [slider setTarget:self];
     [slider setAction:@selector(adjustOpacity:)];
     
+    if(selectionView.selection.size.width == 0 && window_id != 0){
+        NSMenuItem* item = [theMenu addItemWithTitle:@"selct region" action:@selector(selectRegion:) keyEquivalent:@""];
+        [item setTarget:self];
+    }
+
+    if(window_id != 0){
+        NSMenuItem* item = [theMenu addItemWithTitle:@"clear window" action:@selector(changeWindow:) keyEquivalent:@""];
+        [item setTag:0];
+        [item setTarget:self];
+    }
+
     NSMenuItem* itemSlider = [[NSMenuItem alloc] init];
     [itemSlider setEnabled:YES];
     [itemSlider setView:slider];
-
     [theMenu addItem:itemSlider];
     [theMenu addItem:[NSMenuItem separatorItem]];
 
@@ -124,33 +160,14 @@ extern NSWindow* currentWindow;
         [item setTag:windowId];
         index += 1;
     }
-
-    [theMenu addItem:[NSMenuItem separatorItem]];
-
-    if(window_id != 0){
-        NSMenuItem* item = [theMenu addItemWithTitle:@"pause" action:@selector(changeWindow:) keyEquivalent:@""];
-        [item setTag:0];
-        [item setTarget:self];
-
-        NSMenuItem* item2 = [theMenu addItemWithTitle:@"1X" action:@selector(set1x) keyEquivalent:@""];
-        [item2 setTarget:self];
-    }
-    
-    if(selectionView.selection.size.width == 0 && window_id != 0){
-        NSMenuItem* item = [theMenu addItemWithTitle:@"selct region" action:@selector(selectRegion:) keyEquivalent:@""];
-        [item setTarget:self];
-    }
-
-    NSMenuItem* item = [theMenu addItemWithTitle:@"close" action:@selector(close) keyEquivalent:@"w"];
-    [item setTarget:self];
     
     CFRelease(all_windows);
     
     [NSMenu popUpContextMenu:theMenu withEvent:theEvent forView:glView];
 }
 
-- (void)set1x{
-    [glView resizeTo1x];
+- (void) setScale:(NSInteger) scale{
+    if(window_id > 0) [glView setScale:scale];
 }
 
 - (void)adjustOpacity:(id)sender{
@@ -159,14 +176,20 @@ extern NSWindow* currentWindow;
 }
 
 - (void)changeWindow:(id)sender{
-    window_id = (CGWindowID)[(NSMenuItem*)sender tag];
-    selectionView.selection = NSMakeRect(0,0,0,0);
+    window_id = (CGWindowID)[sender tag];
+    selectionView.selection = CGRectZero;
+    if(window_id == 0){
+        [dummyView setFrame:[glView bounds]];
+        [self.contentView setSubviews:@[dummyView]];
+    }
+    else
+        [dummyView removeFromSuperview];
 }
 
 - (void)selectRegion:(id)sender{
     [self setMovable:NO];
     [selectionView setFrameSize:NSMakeSize(glView.bounds.size.width, glView.bounds.size.height)];
-    [self.contentView addSubview:selectionView];
+    [self.contentView setSubviews:@[selectionView]];
     [[NSCursor crosshairCursor] set];
 }
 
