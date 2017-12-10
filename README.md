@@ -20,7 +20,7 @@ cd pip
 
 # build using xcode
 xcodebuild
-./build/Release/pip
+open build/Release/PiP.app
 
 # or simply
 ./run.sh
