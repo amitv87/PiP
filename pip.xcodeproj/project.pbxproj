@@ -34,6 +34,7 @@
 		55ABC4CA1FD2DB73005278DB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		55B827BE1FD3228500DD51A3 /* openGLView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = openGLView.h; sourceTree = "<group>"; };
 		55B827BF1FD322A800DD51A3 /* openGLView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = openGLView.m; sourceTree = "<group>"; };
+		55D766F81FDB157100CA39E9 /* common.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = common.h; sourceTree = "<group>"; };
 		55DDE8C71FD6BAA400B19D89 /* selectionView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = selectionView.h; sourceTree = "<group>"; };
 		55DDE8C81FD6BACF00B19D89 /* selectionView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = selectionView.m; sourceTree = "<group>"; };
 		55DDE8CA1FD6BB3E00B19D89 /* window.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = window.h; sourceTree = "<group>"; };
@@ -80,6 +81,7 @@
 				55DDE8C81FD6BACF00B19D89 /* selectionView.m */,
 				55DDE8CA1FD6BB3E00B19D89 /* window.h */,
 				55DDE8CB1FD6BC3A00B19D89 /* window.m */,
+				55D766F81FDB157100CA39E9 /* common.h */,
 			);
 			path = pip;
 			sourceTree = "<group>";
