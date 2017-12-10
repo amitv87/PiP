@@ -7,28 +7,18 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		55ABC4BC1FD2CB91005278DB /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 55ABC4BB1FD2CB91005278DB /* main.m */; };
-		55ABC4C91FD2D3C8005278DB /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55ABC4C81FD2D3C5005278DB /* CoreGraphics.framework */; };
-		55ABC4CB1FD2DB76005278DB /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55ABC4CA1FD2DB73005278DB /* Cocoa.framework */; };
-		55B827C01FD322A800DD51A3 /* openGLView.m in Sources */ = {isa = PBXBuildFile; fileRef = 55B827BF1FD322A800DD51A3 /* openGLView.m */; };
-		55DDE8C91FD6BACF00B19D89 /* selectionView.m in Sources */ = {isa = PBXBuildFile; fileRef = 55DDE8C81FD6BACF00B19D89 /* selectionView.m */; };
-		55DDE8CC1FD6BC3A00B19D89 /* window.m in Sources */ = {isa = PBXBuildFile; fileRef = 55DDE8CB1FD6BC3A00B19D89 /* window.m */; };
+		554AA7DD1FDDADEE00233377 /* info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 554AA7DC1FDDADEE00233377 /* info.plist */; };
+		554AA7FC1FDDB16200233377 /* Media.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 554AA7FB1FDDB16200233377 /* Media.xcassets */; };
+		559059281FDD13810003B647 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 55ABC4BB1FD2CB91005278DB /* main.m */; };
+		5590592A1FDD13810003B647 /* openGLView.m in Sources */ = {isa = PBXBuildFile; fileRef = 55B827BF1FD322A800DD51A3 /* openGLView.m */; };
+		5590592B1FDD13810003B647 /* selectionView.m in Sources */ = {isa = PBXBuildFile; fileRef = 55DDE8C81FD6BACF00B19D89 /* selectionView.m */; };
+		5590592C1FDD13810003B647 /* window.m in Sources */ = {isa = PBXBuildFile; fileRef = 55DDE8CB1FD6BC3A00B19D89 /* window.m */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXCopyFilesBuildPhase section */
-		55ABC4B61FD2CB91005278DB /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = /usr/share/man/man1/;
-			dstSubfolderSpec = 0;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 1;
-		};
-/* End PBXCopyFilesBuildPhase section */
-
 /* Begin PBXFileReference section */
-		55ABC4B81FD2CB91005278DB /* pip */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = pip; sourceTree = BUILT_PRODUCTS_DIR; };
+		552115841FDD120F00F90350 /* PiP.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PiP.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		554AA7DC1FDDADEE00233377 /* info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = info.plist; sourceTree = "<group>"; };
+		554AA7FB1FDDB16200233377 /* Media.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Media.xcassets; sourceTree = "<group>"; };
 		55ABC4BB1FD2CB91005278DB /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		55ABC4C81FD2D3C5005278DB /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 		55ABC4CA1FD2DB73005278DB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
@@ -42,12 +32,10 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		55ABC4B51FD2CB91005278DB /* Frameworks */ = {
+		552115811FDD120F00F90350 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				55ABC4CB1FD2DB76005278DB /* Cocoa.framework in Frameworks */,
-				55ABC4C91FD2D3C8005278DB /* CoreGraphics.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -66,7 +54,7 @@
 		55ABC4B91FD2CB91005278DB /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				55ABC4B81FD2CB91005278DB /* pip */,
+				552115841FDD120F00F90350 /* PiP.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -82,6 +70,8 @@
 				55DDE8CA1FD6BB3E00B19D89 /* window.h */,
 				55DDE8CB1FD6BC3A00B19D89 /* window.m */,
 				55D766F81FDB157100CA39E9 /* common.h */,
+				554AA7DC1FDDADEE00233377 /* info.plist */,
+				554AA7FB1FDDB16200233377 /* Media.xcassets */,
 			);
 			path = pip;
 			sourceTree = "<group>";
@@ -98,22 +88,22 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		55ABC4B71FD2CB91005278DB /* pip */ = {
+		552115831FDD120F00F90350 /* PiP */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 55ABC4BF1FD2CB91005278DB /* Build configuration list for PBXNativeTarget "pip" */;
+			buildConfigurationList = 552115941FDD120F00F90350 /* Build configuration list for PBXNativeTarget "PiP" */;
 			buildPhases = (
-				55ABC4B41FD2CB91005278DB /* Sources */,
-				55ABC4B51FD2CB91005278DB /* Frameworks */,
-				55ABC4B61FD2CB91005278DB /* CopyFiles */,
+				552115801FDD120F00F90350 /* Sources */,
+				552115811FDD120F00F90350 /* Frameworks */,
+				552115821FDD120F00F90350 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = pip;
-			productName = pip;
-			productReference = 55ABC4B81FD2CB91005278DB /* pip */;
-			productType = "com.apple.product-type.tool";
+			name = PiP;
+			productName = PiP;
+			productReference = 552115841FDD120F00F90350 /* PiP.app */;
+			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
@@ -124,7 +114,7 @@
 				LastUpgradeCheck = 0900;
 				ORGANIZATIONNAME = boggyb;
 				TargetAttributes = {
-					55ABC4B71FD2CB91005278DB = {
+					552115831FDD120F00F90350 = {
 						CreatedOnToolsVersion = 9.0.1;
 						ProvisioningStyle = Automatic;
 					};
@@ -136,32 +126,77 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				Base,
 			);
 			mainGroup = 55ABC4AF1FD2CB91005278DB;
 			productRefGroup = 55ABC4B91FD2CB91005278DB /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				55ABC4B71FD2CB91005278DB /* pip */,
+				552115831FDD120F00F90350 /* PiP */,
 			);
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		552115821FDD120F00F90350 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				554AA7FC1FDDB16200233377 /* Media.xcassets in Resources */,
+				554AA7DD1FDDADEE00233377 /* info.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
-		55ABC4B41FD2CB91005278DB /* Sources */ = {
+		552115801FDD120F00F90350 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				55DDE8C91FD6BACF00B19D89 /* selectionView.m in Sources */,
-				55ABC4BC1FD2CB91005278DB /* main.m in Sources */,
-				55B827C01FD322A800DD51A3 /* openGLView.m in Sources */,
-				55DDE8CC1FD6BC3A00B19D89 /* window.m in Sources */,
+				559059281FDD13810003B647 /* main.m in Sources */,
+				5590592A1FDD13810003B647 /* openGLView.m in Sources */,
+				5590592B1FDD13810003B647 /* selectionView.m in Sources */,
+				5590592C1FDD13810003B647 /* window.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		552115921FDD120F00F90350 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = pip/info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.boggyb.PiP;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		552115931FDD120F00F90350 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = pip/info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.boggyb.PiP;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
 		55ABC4BD1FD2CB91005278DB /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -265,39 +300,23 @@
 			};
 			name = Release;
 		};
-		55ABC4C01FD2CB91005278DB /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-			};
-			name = Debug;
-		};
-		55ABC4C11FD2CB91005278DB /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		552115941FDD120F00F90350 /* Build configuration list for PBXNativeTarget "PiP" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				552115921FDD120F00F90350 /* Debug */,
+				552115931FDD120F00F90350 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		55ABC4B31FD2CB91005278DB /* Build configuration list for PBXProject "pip" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				55ABC4BD1FD2CB91005278DB /* Debug */,
 				55ABC4BE1FD2CB91005278DB /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		55ABC4BF1FD2CB91005278DB /* Build configuration list for PBXNativeTarget "pip" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				55ABC4C01FD2CB91005278DB /* Debug */,
-				55ABC4C11FD2CB91005278DB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
