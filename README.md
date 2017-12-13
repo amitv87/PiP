@@ -2,6 +2,8 @@
 
 Always on top window preview similar to the popular windows only OnTopReplica
 
+[![PiP demo](https://img.youtube.com/vi/MDte5sZCRnY/0.jpg)](https://www.youtube.com/watch?v=MDte5sZCRnY)
+
 **Features:**
 * Clone any visibile window
 * Crop the preview
