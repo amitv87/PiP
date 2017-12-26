@@ -24,6 +24,7 @@ extern Window* currentWindow;
     [self setMovable:YES];
     [self setShowsResizeIndicator:NO];
     [self setLevel: NSFloatingWindowLevel];
+    [self setBackgroundColor:[NSColor clearColor]];
     [self setMinSize:NSMakeSize(kMinSize, kMinSize)];
     [self setMaxSize:[[self screen] visibleFrame].size];
 
