@@ -12,7 +12,7 @@ Always on top window preview similar to the popular windows only OnTopReplica
 * Pinch to zoom
 
 **To do:**
-* Almost all the missing features when comapred to [OnTopReplica](https://github.com/LorenzCK/OnTopReplica)
+* Almost all the missing features when compared to [OnTopReplica](https://github.com/LorenzCK/OnTopReplica)
 
 **Download**
 [PiP-1.0.dmg](https://github.com/amitv87/PiP/releases/download/1.0/PiP-1.0.dmg)

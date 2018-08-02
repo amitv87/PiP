@@ -107,7 +107,7 @@ extern Window* currentWindow;
     [slider setAutoresizingMask:NSViewWidthSizable];
 
     if(selectionView.selection.size.width == 0 && window_id != 0){
-        NSMenuItem* item = [theMenu addItemWithTitle:@"selct region" action:@selector(selectRegion:) keyEquivalent:@""];
+        NSMenuItem* item = [theMenu addItemWithTitle:@"select region" action:@selector(selectRegion:) keyEquivalent:@""];
         [item setTarget:self];
     }
 
