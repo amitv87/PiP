@@ -131,15 +131,19 @@ extern Window* currentWindow;
         CFNumberRef window_layer = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowLayer);
         CFDictionaryRef bounds = (CFDictionaryRef)CFDictionaryGetValue (window_ref, kCGWindowBounds);
 
-//        NSLog(@"window info %@", (__bridge NSDictionary*)window_ref);
-
         CFNumberGetValue(id_ref, kCFNumberIntType, &windowId);
         CFNumberGetValue(window_layer, kCFNumberIntType, &layer);
 
         if(layer != 0) continue;
 
         CGImageRef window_image = CGWindowListCreateImage(CGRectNull, kCGWindowListOptionIncludingWindow, windowId, kCGWindowImageNominalResolution | kCGWindowImageBoundsIgnoreFraming);
-        if(window_image == NULL || (CGImageGetHeight(window_image) == 1 && CGImageGetWidth(window_image) == 1)) continue;
+        if(window_image == NULL) continue;
+
+        bool isFaulty = CGImageGetHeight(window_image) == 1 && CGImageGetWidth(window_image) == 1;
+        CGImageRelease(window_image);
+        if(isFaulty) continue;
+
+//        NSLog(@"window info %@", (__bridge NSDictionary*)window_ref);
 
         CFStringRef name = NULL;
         if(name_ref == NULL){
