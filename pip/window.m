@@ -94,18 +94,18 @@ extern Window* currentWindow;
     uint32_t windowId = 0;
     NSMenu *theMenu = [[NSMenu alloc] init];
     [theMenu setMinimumWidth:100];
-    CFArrayRef all_windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
+    CFArrayRef all_windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
 
     NSSlider* slider = [[NSSlider alloc] init];
 
+    [slider setTarget:self];
     [slider setMinValue:0.1];
     [slider setMaxValue:1.0];
     [slider setDoubleValue:self.alphaValue];
     [slider setFrame:NSMakeRect(0, 0, 200, 30)];
-    slider.autoresizingMask = NSViewWidthSizable;
-    [slider setTarget:self];
     [slider setAction:@selector(adjustOpacity:)];
-    
+    [slider setAutoresizingMask:NSViewWidthSizable];
+
     if(selectionView.selection.size.width == 0 && window_id != 0){
         NSMenuItem* item = [theMenu addItemWithTitle:@"selct region" action:@selector(selectRegion:) keyEquivalent:@""];
         [item setTarget:self];
@@ -131,29 +131,23 @@ extern Window* currentWindow;
         CFNumberRef window_layer = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowLayer);
         CFDictionaryRef bounds = (CFDictionaryRef)CFDictionaryGetValue (window_ref, kCGWindowBounds);
 
-        if(bounds){
-            CGRect rect;
-            CGRectMakeWithDictionaryRepresentation(bounds, &rect);
-            if(rect.size.width < 100 || rect.size.height < 100) continue;
-        }
-        else
-            continue;
-        
+//        NSLog(@"window info %@", (__bridge NSDictionary*)window_ref);
+
         CFNumberGetValue(id_ref, kCFNumberIntType, &windowId);
         CFNumberGetValue(window_layer, kCFNumberIntType, &layer);
-        
+
         if(layer != 0) continue;
-        
+
+        CGImageRef window_image = CGWindowListCreateImage(CGRectNull, kCGWindowListOptionIncludingWindow, windowId, kCGWindowImageNominalResolution | kCGWindowImageBoundsIgnoreFraming);
+        if(window_image == NULL || (CGImageGetHeight(window_image) == 1 && CGImageGetWidth(window_image) == 1)) continue;
+
         CFStringRef name = NULL;
         if(name_ref == NULL){
             name = CFStringCreateWithCString (NULL, "", kCFStringEncodingUTF8);;
         }
-        
-//        NSLog(@"%@", window_ref);
-//        NSLog(@"id: %d, layer: %d, window: %@ %@", windowId, layer, owner_ref, name_ref);
 
         NSString* windowTitle = [[(__bridge NSString*)owner_ref stringByAppendingString:@" - "] stringByAppendingString: (__bridge NSString*)(name_ref ? name_ref : name)];
-        
+
         if(name) CFRelease(name);
         
         NSMenuItem* item = [theMenu addItemWithTitle:windowTitle action:@selector(changeWindow:) keyEquivalent:@""];
@@ -161,9 +155,9 @@ extern Window* currentWindow;
         [item setTag:windowId];
         index += 1;
     }
-    
+
     CFRelease(all_windows);
-    
+
     [NSMenu popUpContextMenu:theMenu withEvent:theEvent forView:glView];
 }
 

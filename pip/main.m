@@ -32,6 +32,7 @@ Window* currentWindow = NULL;
     [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"New" action:@selector(newWindow) keyEquivalent:@"n"]];
     [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"Click Through" action:@selector(clickThrough:) keyEquivalent:@"c"]];
     [appMenu addItem:[NSMenuItem separatorItem]];
+    [appMenu addItem:[[NSMenuItem alloc] initWithTitle:[@"Hide " stringByAppendingString:appName] action:@selector(hideAll) keyEquivalent:@"h"]];
     [appMenu addItem:[[NSMenuItem alloc] initWithTitle:[@"Quit " stringByAppendingString:appName] action:@selector(terminate:) keyEquivalent:@"q"]];
 
     [self addScaleMenuItemWithTitle:@"Scale 1x" keyEquivalent:@"1" mask:NO andScale:100 toMenu:windowMenu];
@@ -84,6 +85,10 @@ Window* currentWindow = NULL;
     [window start];
     [window setIgnoresMouseEvents:clickThroughState];
     [windowMenuItem setEnabled:YES];
+}
+
+- (void) hideAll{
+    [app hide:nil];
 }
 
 - (void) setScale:(id)sender{
