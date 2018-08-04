@@ -19,6 +19,7 @@ extern Window* currentWindow;
     NSRect rect = NSMakeRect(0, 0, kStartSize, kStartSize);
     self = [super initWithContentRect:rect styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskTexturedBackground | NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
     [self setAspectRatio:rect.size];
+    [self setReleasedWhenClosed:YES];
 
     [self center];
     [self setMovable:YES];

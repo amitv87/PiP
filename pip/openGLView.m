@@ -5,45 +5,52 @@
 
 #import "common.h"
 
+CIContext *sharedCIcontext = nil;
+NSOpenGLPixelFormat *pixelFormat = nil;
+NSOpenGLContext* sharedGLContext = nil;
+
+const NSOpenGLPixelFormatAttribute kAttribsAntialised[] = {
+    NSOpenGLPFAAccelerated,
+    NSOpenGLPFANoRecovery,
+    NSOpenGLPFADoubleBuffer,
+    NSOpenGLPFAColorSize, 24,
+    NSOpenGLPFAAlphaSize, 8,
+    NSOpenGLPFAMultisample,
+    NSOpenGLPFASampleBuffers, 1,
+    NSOpenGLPFASamples, 4,
+    0,
+};
+
+const NSOpenGLPixelFormatAttribute kAttribsBasic[] = {
+    NSOpenGLPFAAccelerated,
+    NSOpenGLPFADoubleBuffer,
+    NSOpenGLPFAColorSize, 24,
+    NSOpenGLPFAAlphaSize, 8,
+    0,
+};
+
+void initGL(){
+    if (nil == pixelFormat) pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:kAttribsAntialised];
+
+    if (nil == pixelFormat) {
+        NSLog(@"Couldn't find an FSAA pixel format, trying something more basic");
+        pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:kAttribsBasic];
+    }
+
+    if(nil == sharedGLContext) sharedGLContext = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil];
+
+    if(nil == sharedCIcontext) sharedCIcontext = [CIContext contextWithCGLContext:[sharedGLContext CGLContextObj] pixelFormat:[pixelFormat CGLPixelFormatObj] colorSpace: nil options: nil];
+}
+
 @implementation OpenGLView
 
 - (id)initWithFrame:(NSRect)frameRect rightCLickDelegate:(id<RightCLickDelegate>) delegate{
+    
+    self = [super initWithFrame:frameRect pixelFormat:pixelFormat];
 
-    NSOpenGLPixelFormatAttribute   attribsAntialised[] = {
-        NSOpenGLPFAAccelerated,
-        NSOpenGLPFANoRecovery,
-        NSOpenGLPFADoubleBuffer,
-        NSOpenGLPFAColorSize, 24,
-        NSOpenGLPFAAlphaSize, 8,
-        NSOpenGLPFAMultisample,
-        NSOpenGLPFASampleBuffers, 1,
-        NSOpenGLPFASamples, 4,
-        0,
-    };
-
-    NSOpenGLPixelFormatAttribute   attribsBasic[] = {
-        NSOpenGLPFAAccelerated,
-        NSOpenGLPFADoubleBuffer,
-        NSOpenGLPFAColorSize, 24,
-        NSOpenGLPFAAlphaSize, 8,
-        0,
-    };
-    
-    NSOpenGLPixelFormat *_pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attribsAntialised];
-    
-    if (nil == _pixelFormat) {
-        NSLog(@"Couldn't find an FSAA pixel format, trying something more basic");
-        _pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attribsBasic];
-    }
-    
-    self = [super initWithFrame:frameRect pixelFormat:_pixelFormat];
-    
-    pixelFormat = _pixelFormat;
-    
-    if (self) {
-        int VBL = 1;
-        [[self openGLContext] setValues:&VBL forParameter:NSOpenGLCPSwapInterval];
-    }
+    int VBL = 1;
+    [self setOpenGLContext:sharedGLContext];
+    [[self openGLContext] setValues:&VBL forParameter:NSOpenGLCPSwapInterval];
     
     alreadyCropped = false;
     imageRect = CGRectMake(0,0,200,200);
@@ -51,16 +58,6 @@
     rightCLickDelegate = delegate;
     
     return self;
-}
-
-- (BOOL)createCIContext{
-    myCIcontext = [CIContext contextWithCGLContext:[[self openGLContext] CGLContextObj] pixelFormat:[pixelFormat CGLPixelFormatObj] colorSpace: nil options: nil];
-
-    if (!myCIcontext){
-        NSLog(@"CIContext creation failed");
-        return NO;
-    }
-    return YES;
 }
 
 - (void)setFBO{
@@ -107,7 +104,6 @@
 
 - (void)prepareOpenGL{
     glEnable(GL_TEXTURE_RECTANGLE_ARB);
-    [self createCIContext];
 }
 
 - (void) renderScene{
@@ -124,7 +120,8 @@
         [self.window setAspectRatio:bounds.size];
     }
     else{
-    doNormally:bounds = [self bounds];
+    doNormally:
+        bounds = [self bounds];
         float screenAspectRatio = bounds.size.width / bounds.size.height;
         float arr = imageAspectRatio / screenAspectRatio;
         if( 0.99 > arr || arr > 1.01){
@@ -212,7 +209,7 @@
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    [myCIcontext drawImage: myCIImage atPoint: CGPointZero  fromRect: imageRect];
+    [sharedCIcontext drawImage: myCIImage atPoint: CGPointZero  fromRect: imageRect];
 
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
     

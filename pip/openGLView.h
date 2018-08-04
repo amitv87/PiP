@@ -3,6 +3,8 @@
 
 #import <Cocoa/Cocoa.h>
 
+void initGL(void);
+
 @protocol RightCLickDelegate <NSObject>
 - (void)rightMouseDown:(NSEvent *)theEvent;
 @end
@@ -14,9 +16,7 @@
     BOOL setScaleOnce;
     BOOL alreadyCropped;
     GLuint FBOTextureId;
-    CIContext *myCIcontext;
     GLfloat imageAspectRatio;
-    NSOpenGLPixelFormat *pixelFormat;
     id<RightCLickDelegate> rightCLickDelegate;
 }
 - (id)initWithFrame:(NSRect)frameRect rightCLickDelegate:(id<RightCLickDelegate>) delegate;

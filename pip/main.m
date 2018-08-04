@@ -107,6 +107,7 @@ Window* currentWindow = NULL;
 -(void)applicationDidFinishLaunching:(NSNotification *)notification{
     [app setActivationPolicy:NSApplicationActivationPolicyRegular];
     [app activateIgnoringOtherApps:YES];
+    initGL();
     [self newWindow];
 }
 
