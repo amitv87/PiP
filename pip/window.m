@@ -129,7 +129,6 @@ extern Window* currentWindow;
         CFStringRef name_ref = (CFStringRef)CFDictionaryGetValue(window_ref, kCGWindowName);
         CFStringRef owner_ref = (CFStringRef)CFDictionaryGetValue(window_ref, kCGWindowOwnerName);
         CFNumberRef window_layer = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowLayer);
-        CFDictionaryRef bounds = (CFDictionaryRef)CFDictionaryGetValue (window_ref, kCGWindowBounds);
 
         CFNumberGetValue(id_ref, kCFNumberIntType, &windowId);
         CFNumberGetValue(window_layer, kCFNumberIntType, &layer);
