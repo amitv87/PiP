@@ -15,7 +15,7 @@ Always on top window preview similar to the popular windows only OnTopReplica
 * Almost all the missing features when compared to [OnTopReplica](https://github.com/LorenzCK/OnTopReplica)
 
 **Download**
-[PiP-1.0.dmg](https://github.com/amitv87/PiP/releases/download/1.0/PiP-1.0.dmg)
+[PiP-1.01.dmg](https://github.com/amitv87/PiP/releases/download/1.01/PiP-1.01.dmg)
 
 **Build and run:**
 ~~~
