@@ -12,6 +12,7 @@
 		5590592A1FDD13810003B647 /* openGLView.m in Sources */ = {isa = PBXBuildFile; fileRef = 55B827BF1FD322A800DD51A3 /* openGLView.m */; };
 		5590592B1FDD13810003B647 /* selectionView.m in Sources */ = {isa = PBXBuildFile; fileRef = 55DDE8C81FD6BACF00B19D89 /* selectionView.m */; };
 		5590592C1FDD13810003B647 /* window.m in Sources */ = {isa = PBXBuildFile; fileRef = 55DDE8CB1FD6BC3A00B19D89 /* window.m */; };
+		55FEB9202115EA9A00D8350C /* PIP.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55FEB91F2115EA9A00D8350C /* PIP.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,8 @@
 		55DDE8C81FD6BACF00B19D89 /* selectionView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = selectionView.m; sourceTree = "<group>"; };
 		55DDE8CA1FD6BB3E00B19D89 /* window.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = window.h; sourceTree = "<group>"; };
 		55DDE8CB1FD6BC3A00B19D89 /* window.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = window.m; sourceTree = "<group>"; };
+		55FEB91F2115EA9A00D8350C /* PIP.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = PIP.framework; path = /System/Library/PrivateFrameworks/PIP.framework; sourceTree = "<group>"; };
+		55FEB9212115ECCC00D8350C /* pip.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = pip.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -35,6 +38,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				55FEB9202115EA9A00D8350C /* PIP.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -64,6 +68,7 @@
 				55ABC4BB1FD2CB91005278DB /* main.m */,
 				55B827BE1FD3228500DD51A3 /* openGLView.h */,
 				55B827BF1FD322A800DD51A3 /* openGLView.m */,
+				55FEB9212115ECCC00D8350C /* pip.h */,
 				55DDE8C71FD6BAA400B19D89 /* selectionView.h */,
 				55DDE8C81FD6BACF00B19D89 /* selectionView.m */,
 				55DDE8CA1FD6BB3E00B19D89 /* window.h */,
@@ -78,6 +83,7 @@
 		55ABC4C21FD2D2DD005278DB /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				55FEB91F2115EA9A00D8350C /* PIP.framework */,
 				55ABC4CA1FD2DB73005278DB /* Cocoa.framework */,
 				55ABC4C81FD2D3C5005278DB /* CoreGraphics.framework */,
 			);
@@ -172,6 +178,10 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SYSTEM_LIBRARY_DIR)/PrivateFrameworks",
+				);
 				INFOPLIST_FILE = pip/info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.boggyb.PiP;
@@ -188,6 +198,10 @@
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SYSTEM_LIBRARY_DIR)/PrivateFrameworks",
+				);
 				INFOPLIST_FILE = pip/info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.boggyb.PiP;

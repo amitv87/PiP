@@ -25,15 +25,9 @@ extern Window* currentWindow;
     [self setMovable:YES];
     [self setShowsResizeIndicator:NO];
     [self setLevel: NSFloatingWindowLevel];
-    [self setBackgroundColor:[NSColor clearColor]];
+//    [self setBackgroundColor:[NSColor clearColor]];
     [self setMinSize:NSMakeSize(kMinSize, kMinSize)];
     [self setMaxSize:[[self screen] visibleFrame].size];
-
-    glView = [[OpenGLView alloc] initWithFrame:rect rightCLickDelegate:self];
-    [glView setWantsLayer: YES];
-    [glView.layer setCornerRadius: 5];
-    [glView.layer setMasksToBounds:YES];
-    [self setContentView:glView];
 
     [self setDelegate:self];
     [self setRestorable:NO];
@@ -41,6 +35,11 @@ extern Window* currentWindow;
     [self setReleasedWhenClosed:NO];
     [self makeKeyAndOrderFront:self];
     [self setMovableByWindowBackground:YES];
+
+    glView = [[OpenGLView alloc] initWithFrame:rect windowDelegate:self];
+    [glView setWantsLayer: YES];
+    [glView.layer setCornerRadius: 5];
+    [glView.layer setMasksToBounds:YES];
 
     selectionView = [[SelectionView alloc] init];
     selectionView.selection = CGRectZero;
@@ -65,8 +64,28 @@ extern Window* currentWindow;
     [textView setAutoresizingMask: NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin];
     [dummyView addSubview: textView];
 
-    [self.contentView setSubviews:@[dummyView]];
+    [glView setSubviews:@[dummyView]];
+  
+    nvc = [[NSViewController alloc] init];
+    [nvc setView:glView];
+    [self setContentViewController:nvc];
+
+    [self startPiP];
+
     return self;
+}
+
+- (void) startPiP{
+  pvc = [[PIPViewController alloc] init];
+  [pvc setDelegate:self];
+  [pvc presentViewControllerAsPictureInPicture:nvc];
+}
+
+- (void) setSize:(CGSize)size andAspectRatio:(CGSize) ar{
+  [self setAspectRatio:ar];
+  [self setContentSize:size];
+  [nvc viewWillTransitionToSize:size];
+  [pvc setAspectRatio:ar];
 }
 
 - (BOOL) canBecomeKeyWindow{
