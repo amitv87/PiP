@@ -9,14 +9,17 @@
 #ifndef Window_h
 #define Window_h
 
+#import "pip.h"
 #import "openGLView.h"
 #import "selectionView.h"
 
-@interface Window : NSWindow<NSWindowDelegate, RightCLickDelegate>{
+@interface Window : NSWindow<NSWindowDelegate, WindowDelegate, PIPViewControllerDelegate>{
     NSTimer* timer;
     CGWindowID window_id;
     NSView* dummyView;
     OpenGLView* glView;
+    NSViewController* nvc;
+    PIPViewController* pvc;
     SelectionView* selectionView;
 }
 

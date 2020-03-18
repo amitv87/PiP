@@ -44,7 +44,7 @@ void initGL(){
 
 @implementation OpenGLView
 
-- (id)initWithFrame:(NSRect)frameRect rightCLickDelegate:(id<RightCLickDelegate>) delegate{
+- (id)initWithFrame:(NSRect)frameRect windowDelegate:(id<WindowDelegate>) delegate{
     
     self = [super initWithFrame:frameRect pixelFormat:pixelFormat];
 
@@ -55,7 +55,7 @@ void initGL(){
     alreadyCropped = false;
     imageRect = CGRectMake(0,0,200,200);
     imageAspectRatio = 0;
-    rightCLickDelegate = delegate;
+    windowDelegate = delegate;
     
     return self;
 }
@@ -116,18 +116,14 @@ void initGL(){
         NSRect windowBounds = [[[self window] screen] visibleFrame];
         bounds = NSMakeRect(0, 0, imageRect.size.width * scale / 100, imageRect.size.height * scale / 100);
         if(windowBounds.size.width < bounds.size.width || windowBounds.size.height < bounds.size.height || bounds.size.width < kMinSize || bounds.size.height < kMinSize) goto doNormally;
-        [self.window setContentSize:bounds.size];
-        [self.window setAspectRatio:bounds.size];
+        [windowDelegate setSize:bounds.size andAspectRatio:bounds.size];
     }
     else{
     doNormally:
         bounds = [self bounds];
         float screenAspectRatio = bounds.size.width / bounds.size.height;
         float arr = imageAspectRatio / screenAspectRatio;
-        if( 0.99 > arr || arr > 1.01){
-            [self.window setContentSize:NSMakeSize(bounds.size.width, bounds.size.width / imageAspectRatio)];
-            [self.window setAspectRatio:imageRect.size];
-        }
+        if( 0.99 > arr || arr > 1.01) [windowDelegate setSize:NSMakeSize(bounds.size.width, bounds.size.width / imageAspectRatio) andAspectRatio:imageRect.size];
     }
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -222,7 +218,7 @@ void initGL(){
 }
 
 - (void)rightMouseDown:(NSEvent *)theEvent {
-    [rightCLickDelegate rightMouseDown:theEvent];
+    [windowDelegate rightMouseDown:theEvent];
 }
 
 - (void)magnifyWithEvent:(NSEvent *)event{

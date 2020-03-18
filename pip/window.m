@@ -11,92 +11,154 @@
 
 extern Window* currentWindow;
 
+static Window* nativePiP = nil;
+
 @implementation Window
 
 - (id) init{
-    timer = NULL;
-    window_id = 0;
-    NSRect rect = NSMakeRect(0, 0, kStartSize, kStartSize);
-    self = [super initWithContentRect:rect styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskTexturedBackground | NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
-    [self setAspectRatio:rect.size];
-    [self setReleasedWhenClosed:YES];
+  pvc = nil;
+  timer = NULL;
+  window_id = 0;
+  NSRect rect = NSMakeRect(0, 0, kStartSize, kStartSize);
+  self = [super initWithContentRect:rect styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskTexturedBackground | NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
+  [self setAspectRatio:rect.size];
+  [self setReleasedWhenClosed:YES];
 
-    [self center];
-    [self setMovable:YES];
-    [self setShowsResizeIndicator:NO];
-    [self setLevel: NSFloatingWindowLevel];
-    [self setBackgroundColor:[NSColor clearColor]];
-    [self setMinSize:NSMakeSize(kMinSize, kMinSize)];
-    [self setMaxSize:[[self screen] visibleFrame].size];
+  [self center];
+  [self setMovable:YES];
+  [self setShowsResizeIndicator:NO];
+  [self setLevel: NSFloatingWindowLevel];
+  [self setMinSize:NSMakeSize(kMinSize, kMinSize)];
+  [self setMaxSize:[[self screen] visibleFrame].size];
 
-    glView = [[OpenGLView alloc] initWithFrame:rect rightCLickDelegate:self];
-    [glView setWantsLayer: YES];
-    [glView.layer setCornerRadius: 5];
-    [glView.layer setMasksToBounds:YES];
-    [self setContentView:glView];
+  [self setDelegate:self];
+  [self setRestorable:NO];
+  [self setWindowController:NULL];
+  [self setReleasedWhenClosed:NO];
+  [self makeKeyAndOrderFront:self];
+  [self setMovableByWindowBackground:YES];
 
-    [self setDelegate:self];
-    [self setRestorable:NO];
-    [self setWindowController:NULL];
-    [self setReleasedWhenClosed:NO];
-    [self makeKeyAndOrderFront:self];
-    [self setMovableByWindowBackground:YES];
+  glView = [[OpenGLView alloc] initWithFrame:rect windowDelegate:self];
+  [glView setWantsLayer: YES];
+  [glView.layer setCornerRadius: 5];
+  [glView.layer setMasksToBounds:YES];
 
-    selectionView = [[SelectionView alloc] init];
-    selectionView.selection = CGRectZero;
-    selectionView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+  selectionView = [[SelectionView alloc] init];
+  selectionView.selection = CGRectZero;
+  selectionView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
-    dummyView = [[NSView alloc] initWithFrame:rect];
-    dummyView.wantsLayer = YES;
-    dummyView.layer.backgroundColor = [NSColor blackColor].CGColor;
-    dummyView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+  dummyView = [[NSView alloc] initWithFrame:rect];
+  dummyView.wantsLayer = YES;
+  dummyView.layer.backgroundColor = [NSColor blackColor].CGColor;
+  dummyView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
-    NSString* text = @"Right click anywhere on the window";
-    NSTextView* textView = [[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, 250, 0)];
+  NSString* text = @"Right click anywhere on the window";
+  NSTextView* textView = [[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, 250, 0)];
 
-    [textView setFrameOrigin:NSMakePoint((NSWidth([dummyView bounds]) - NSWidth([textView frame])) / 2, (NSHeight([dummyView bounds]) - NSHeight([textView frame])) / 2)];
+  [textView setFrameOrigin:NSMakePoint((NSWidth([dummyView bounds]) - NSWidth([textView frame])) / 2, (NSHeight([dummyView bounds]) - NSHeight([textView frame])) / 2)];
 
-    [textView setString:text];
-    [textView setEditable:NO];
-    [textView setSelectable:NO];
-    [textView setTextColor:[NSColor whiteColor]];
-    [textView setAlignment:NSTextAlignmentCenter];
-    [textView setBackgroundColor:[NSColor blackColor]];
-    [textView setAutoresizingMask: NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin];
-    [dummyView addSubview: textView];
+  [textView setString:text];
+  [textView setEditable:NO];
+  [textView setSelectable:NO];
+  [textView setTextColor:[NSColor whiteColor]];
+  [textView setAlignment:NSTextAlignmentCenter];
+  [textView setBackgroundColor:[NSColor blackColor]];
+  [textView setAutoresizingMask: NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin];
+  [dummyView addSubview: textView];
 
-    [self.contentView setSubviews:@[dummyView]];
-    return self;
+  [glView setSubviews:@[dummyView]];
+  
+  nvc = [[NSViewController alloc] init];
+  [nvc setView:glView];
+  [self setContentViewController:nvc];
+
+  return self;
+}
+
+- (void) startPiP{
+  if(nativePiP) [nativePiP stopPip];
+  pvc = [[PIPViewController alloc] init];
+  [pvc setDelegate:self];
+  [pvc presentViewControllerAsPictureInPicture:nvc];
+  [pvc setAspectRatio:[self aspectRatio]];
+  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onPiPResize) name:NSWindowDidResizeNotification object:[[pvc view] window]];
+  [self setIsVisible:false];
+  nativePiP = self;
+}
+
+- (void)stopPip{
+  [pvc dismissViewController:nvc];
+  [self pipDidClose:pvc];
+}
+
+- (void)pipDidClose:(PIPViewController *)pip{
+  pvc = nil;
+  [self setIsVisible:true];
+  [self setContentViewController:nil];
+  [self setContentViewController:nvc];
+  if(nativePiP == self) nativePiP = nil;
+}
+
+- (void)onPiPResize{
+  if(pvc) [self setContentSize:[[[pvc view] window] frame].size];
+}
+
+- (void) setSize:(CGSize)size andAspectRatio:(CGSize) ar{
+  [self setAspectRatio:ar];
+  [self setContentSize:size];
+  [nvc viewWillTransitionToSize:size];
+  if(pvc){
+    [pvc setAspectRatio:ar];
+    NSWindow* pipwindow = [[pvc view] window];
+    [pipwindow setFrame:[self frame] display:true];
+  }
 }
 
 - (BOOL) canBecomeKeyWindow{
-    return YES;
+  return YES;
 }
 
 - (void) start{
-    if(timer != NULL) return;
-    timer = [NSTimer timerWithTimeInterval:0.03f target:self selector:@selector(captrue:) userInfo:nil repeats:YES];
-    [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
+  if(timer != NULL) return;
+  timer = [NSTimer timerWithTimeInterval:0.03f target:self selector:@selector(captrue:) userInfo:nil repeats:YES];
+  [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
 }
 
 - (void)captrue:(NSTimer *)timer{
-    if(window_id == 0) return;
-    CGImageRef window_image = CGWindowListCreateImage(CGRectNull, kCGWindowListOptionIncludingWindow, window_id, kCGWindowImageNominalResolution | kCGWindowImageBoundsIgnoreFraming);
-    if(window_image != NULL){
-        [glView drawImage:window_image withRect:selectionView.selection];
-        CGImageRelease(window_image);
-    }
-    else
-        window_id = 0;
+  if(window_id == 0) return;
+  CGImageRef window_image = CGWindowListCreateImage(CGRectNull, kCGWindowListOptionIncludingWindow, window_id, kCGWindowImageNominalResolution | kCGWindowImageBoundsIgnoreFraming);
+  if(window_image != NULL){
+    [glView drawImage:window_image withRect:selectionView.selection];
+    CGImageRelease(window_image);
+  }
+  else
+    window_id = 0;
 }
 
 - (void)rightMouseDown:(NSEvent *)theEvent { 
-    int layer = -1, index = 0;
-    uint32_t windowId = 0;
-    NSMenu *theMenu = [[NSMenu alloc] init];
-    [theMenu setMinimumWidth:100];
-    CFArrayRef all_windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
+  int layer = -1, index = 0;
+  uint32_t windowId = 0;
+  NSMenu *theMenu = [[NSMenu alloc] init];
+  [theMenu setMinimumWidth:100];
+  CFArrayRef all_windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
 
+  if(pvc == nil){
+    NSMenuItem* item = [theMenu addItemWithTitle:@"native pip" action:@selector(startPiP) keyEquivalent:@""];
+    [item setTarget:self];
+
+    if(selectionView.selection.size.width == 0 && window_id != 0){
+      NSMenuItem* item = [theMenu addItemWithTitle:@"select region" action:@selector(selectRegion:) keyEquivalent:@""];
+      [item setTarget:self];
+    }
+  }
+
+  if(window_id != 0){
+    NSMenuItem* item = [theMenu addItemWithTitle:@"clear window" action:@selector(changeWindow:) keyEquivalent:@""];
+    [item setTag:0];
+    [item setTarget:self];
+  }
+
+  if(pvc == nil){
     NSSlider* slider = [[NSSlider alloc] init];
 
     [slider setTarget:self];
@@ -107,102 +169,91 @@ extern Window* currentWindow;
     [slider setAction:@selector(adjustOpacity:)];
     [slider setAutoresizingMask:NSViewWidthSizable];
 
-    if(selectionView.selection.size.width == 0 && window_id != 0){
-        NSMenuItem* item = [theMenu addItemWithTitle:@"select region" action:@selector(selectRegion:) keyEquivalent:@""];
-        [item setTarget:self];
-    }
-
-    if(window_id != 0){
-        NSMenuItem* item = [theMenu addItemWithTitle:@"clear window" action:@selector(changeWindow:) keyEquivalent:@""];
-        [item setTag:0];
-        [item setTarget:self];
-    }
-
     NSMenuItem* itemSlider = [[NSMenuItem alloc] init];
     [itemSlider setEnabled:YES];
     [itemSlider setView:slider];
     [theMenu addItem:itemSlider];
-    [theMenu addItem:[NSMenuItem separatorItem]];
+  }
 
-    for (CFIndex i = 0; i < CFArrayGetCount(all_windows); ++i) {
-        CFDictionaryRef window_ref = (CFDictionaryRef)CFArrayGetValueAtIndex(all_windows, i);
-        CFNumberRef id_ref = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowNumber);
-        CFStringRef name_ref = (CFStringRef)CFDictionaryGetValue(window_ref, kCGWindowName);
-        CFStringRef owner_ref = (CFStringRef)CFDictionaryGetValue(window_ref, kCGWindowOwnerName);
-        CFNumberRef window_layer = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowLayer);
+  [theMenu addItem:[NSMenuItem separatorItem]];
 
-        CFNumberGetValue(id_ref, kCFNumberIntType, &windowId);
-        CFNumberGetValue(window_layer, kCFNumberIntType, &layer);
+  for (CFIndex i = 0; i < CFArrayGetCount(all_windows); ++i) {
+    CFDictionaryRef window_ref = (CFDictionaryRef)CFArrayGetValueAtIndex(all_windows, i);
+    CFNumberRef id_ref = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowNumber);
+    CFStringRef name_ref = (CFStringRef)CFDictionaryGetValue(window_ref, kCGWindowName);
+    CFStringRef owner_ref = (CFStringRef)CFDictionaryGetValue(window_ref, kCGWindowOwnerName);
+    CFNumberRef window_layer = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowLayer);
 
-        if(layer != 0) continue;
+    CFNumberGetValue(id_ref, kCFNumberIntType, &windowId);
+    CFNumberGetValue(window_layer, kCFNumberIntType, &layer);
 
-        CGImageRef window_image = CGWindowListCreateImage(CGRectNull, kCGWindowListOptionIncludingWindow, windowId, kCGWindowImageNominalResolution | kCGWindowImageBoundsIgnoreFraming);
-        if(window_image == NULL) continue;
+    if(layer != 0) continue;
 
-        bool isFaulty = CGImageGetHeight(window_image) == 1 && CGImageGetWidth(window_image) == 1;
-        CGImageRelease(window_image);
-        if(isFaulty) continue;
+    CGImageRef window_image = CGWindowListCreateImage(CGRectNull, kCGWindowListOptionIncludingWindow, windowId, kCGWindowImageNominalResolution | kCGWindowImageBoundsIgnoreFraming);
+    if(window_image == NULL) continue;
 
-//        NSLog(@"window info %@", (__bridge NSDictionary*)window_ref);
+    bool isFaulty = CGImageGetHeight(window_image) == 1 && CGImageGetWidth(window_image) == 1;
+    CGImageRelease(window_image);
+    if(isFaulty) continue;
 
-        CFStringRef name = NULL;
-        if(name_ref == NULL){
-            name = CFStringCreateWithCString (NULL, "", kCFStringEncodingUTF8);;
-        }
-
-        NSString* windowTitle = [[(__bridge NSString*)owner_ref stringByAppendingString:@" - "] stringByAppendingString: (__bridge NSString*)(name_ref ? name_ref : name)];
-
-        if(name) CFRelease(name);
-        
-        NSMenuItem* item = [theMenu addItemWithTitle:windowTitle action:@selector(changeWindow:) keyEquivalent:@""];
-        [item setTarget:self];
-        [item setTag:windowId];
-        index += 1;
+    CFStringRef name = NULL;
+    if(name_ref == NULL){
+      name = CFStringCreateWithCString (NULL, "", kCFStringEncodingUTF8);;
     }
 
-    CFRelease(all_windows);
+    NSString* windowTitle = [[(__bridge NSString*)owner_ref stringByAppendingString:@" - "] stringByAppendingString: (__bridge NSString*)(name_ref ? name_ref : name)];
 
-    [NSMenu popUpContextMenu:theMenu withEvent:theEvent forView:glView];
+    if(name) CFRelease(name);
+
+    NSMenuItem* item = [theMenu addItemWithTitle:windowTitle action:@selector(changeWindow:) keyEquivalent:@""];
+    [item setTarget:self];
+    [item setTag:windowId];
+    index += 1;
+  }
+
+  CFRelease(all_windows);
+
+  [NSMenu popUpContextMenu:theMenu withEvent:theEvent forView:glView];
 }
 
 - (void) setScale:(NSInteger) scale{
-    if(window_id > 0) [glView setScale:scale];
+  if(window_id > 0) [glView setScale:scale];
 }
 
 - (void)adjustOpacity:(id)sender{
-    NSSlider* slider = (NSSlider*)sender;
-    [self setAlphaValue:slider.doubleValue];
+  NSSlider* slider = (NSSlider*)sender;
+  [self setAlphaValue:slider.doubleValue];
 }
 
 - (void)changeWindow:(id)sender{
-    window_id = (CGWindowID)[sender tag];
-    selectionView.selection = CGRectZero;
-    if(window_id == 0){
-        [dummyView setFrame:[glView bounds]];
-        [self.contentView setSubviews:@[dummyView]];
-    }
-    else
-        [dummyView removeFromSuperview];
+  window_id = (CGWindowID)[sender tag];
+  selectionView.selection = CGRectZero;
+  if(window_id == 0){
+    [dummyView setFrame:[glView bounds]];
+    [self.contentView setSubviews:@[dummyView]];
+  }
+  else
+    [dummyView removeFromSuperview];
 }
 
 - (void)selectRegion:(id)sender{
-    [self setMovable:NO];
-    [selectionView setFrameSize:NSMakeSize(glView.bounds.size.width, glView.bounds.size.height)];
-    [self.contentView setSubviews:@[selectionView]];
-    [[NSCursor crosshairCursor] set];
+  [self setMovable:NO];
+  [selectionView setFrameSize:NSMakeSize(glView.bounds.size.width, glView.bounds.size.height)];
+  [self.contentView setSubviews:@[selectionView]];
+  [[NSCursor crosshairCursor] set];
 }
 
 - (void)windowDidBecomeKey:(NSNotification *)notification{
-    currentWindow = self;
+  currentWindow = self;
 }
 
 - (void)close{
-    window_id = 0;
-    if(timer) [timer invalidate];
-    glView = NULL;
-    selectionView = NULL;
-    [self setContentView:NULL];
-    [super close];
+  window_id = 0;
+  if(timer) [timer invalidate];
+  glView = NULL;
+  selectionView = NULL;
+  [self setContentView:NULL];
+  [super close];
 }
 
 @end
