@@ -8,8 +8,6 @@
 
 #import "window.h"
 
-Window* currentWindow = NULL;
-
 @interface MyApplicationDelegate : NSObject <NSApplicationDelegate> {
     NSApplication* app;
     NSMenuItem* windowMenuItem;
@@ -72,12 +70,24 @@ Window* currentWindow = NULL;
 }
 
 - (void) closeWindow{
-    if([[app windows] count] == 1) [windowMenuItem setEnabled:NO];
-    if(currentWindow){
-        Window* cWindow = currentWindow;
-        currentWindow = NULL;
-        [cWindow close];
+  Window* currentWindow = (Window*)[app keyWindow];
+  if(![currentWindow isKindOfClass:[NSWindow class]]){
+    currentWindow = NULL;
+    for(NSWindow* window in [app windows]){
+      if([window isKindOfClass:[NSWindow class]]){
+        currentWindow = (Window*)window;
+        break;
+      }
     }
+  }
+  if(currentWindow){
+    [currentWindow close];
+    [app removeWindowsItem:currentWindow];
+  }
+
+  [windowMenuItem setEnabled:[[app windows] count] > 1];
+
+//  NSLog(@"closeWindow wc: %lu", [[app windows] count]);
 }
 
 - (void) newWindow{
@@ -85,6 +95,7 @@ Window* currentWindow = NULL;
     [window start];
     [window setIgnoresMouseEvents:clickThroughState];
     [windowMenuItem setEnabled:YES];
+//    NSLog(@"newWindow wc: %lu", [[app windows] count]);
 }
 
 - (void) hideAll{
@@ -92,7 +103,8 @@ Window* currentWindow = NULL;
 }
 
 - (void) setScale:(id)sender{
-    if(currentWindow) [currentWindow setScale:[sender tag]];
+  Window* currentWindow = (Window*)[app keyWindow];
+  if(currentWindow) [currentWindow setScale:[sender tag]];
 }
 
 -(void) clickThrough:(id)sender{
@@ -100,7 +112,7 @@ Window* currentWindow = NULL;
     clickThroughState = !item.state;
     [item setState:clickThroughState];
     for(NSWindow* window in [app windows]){
-        [window setIgnoresMouseEvents:clickThroughState];
+      if([window isKindOfClass:[NSWindow class]]) [window setIgnoresMouseEvents:clickThroughState];
     }
 }
 
