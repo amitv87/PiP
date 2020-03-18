@@ -56,7 +56,6 @@ void initGL(){
     imageRect = CGRectMake(0,0,200,200);
     imageAspectRatio = 0;
     windowDelegate = delegate;
-    
     return self;
 }
 
@@ -215,10 +214,6 @@ void initGL(){
 - (void) setScale:(NSInteger) _scale{
     scale = _scale;
     setScaleOnce = true;
-}
-
-- (void)rightMouseDown:(NSEvent *)theEvent {
-    [windowDelegate rightMouseDown:theEvent];
 }
 
 - (void)magnifyWithEvent:(NSEvent *)event{

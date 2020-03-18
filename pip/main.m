@@ -84,9 +84,7 @@
     [currentWindow close];
     [app removeWindowsItem:currentWindow];
   }
-
   [windowMenuItem setEnabled:[[app windows] count] > 1];
-
 //  NSLog(@"closeWindow wc: %lu", [[app windows] count]);
 }
 

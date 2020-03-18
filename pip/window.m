@@ -10,6 +10,16 @@
 #import "window.h"
 
 static Window* nativePiP = nil;
+static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable | NSWindowStyleMaskFullSizeContentView | NSWindowStyleMaskUnifiedTitleAndToolbar;
+
+@interface WindowSel : NSObject{}
+@property (nonatomic) NSString* owner;
+@property (nonatomic) NSString* title;
+@property (nonatomic) CGWindowID winId;
+@end
+
+@implementation WindowSel
+@end
 
 @implementation Window
 
@@ -18,30 +28,36 @@ static Window* nativePiP = nil;
   timer = NULL;
   window_id = 0;
   NSRect rect = NSMakeRect(0, 0, kStartSize, kStartSize);
-//  NSUInteger mask = NSWindowStyleMaskTitled|NSWindowStyleMaskClosable;
-  NSUInteger mask = NSWindowStyleMaskBorderless | NSWindowStyleMaskTexturedBackground | NSWindowStyleMaskResizable;
-  self = [super initWithContentRect:rect styleMask:mask backing:NSBackingStoreBuffered defer:YES];
-  [self setAspectRatio:rect.size];
-  [self setReleasedWhenClosed:NO];
+
+  self = [super initWithContentRect:rect styleMask:kStyleMaskOnHoverIn backing:NSBackingStoreBuffered defer:YES];
 
   [self center];
+  [self setOpaque:NO];
   [self setMovable:YES];
+  [self setDelegate:self];
+  [self setAspectRatio:rect.size];
+  [self setReleasedWhenClosed:NO];
+  [self makeKeyAndOrderFront:self];
   [self setShowsResizeIndicator:NO];
   [self setLevel: NSFloatingWindowLevel];
+  [self setMovableByWindowBackground:YES];
+  [self setTitlebarAppearsTransparent:true];
   [self setMinSize:NSMakeSize(kMinSize, kMinSize)];
   [self setMaxSize:[[self screen] visibleFrame].size];
+  [self setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameAqua]];
 
-  [self setDelegate:self];
-  [self setRestorable:NO];
-  [self setWindowController:NULL];
-  [self makeKeyAndOrderFront:self];
-  [self setMovableByWindowBackground:YES];
 
-  nvc = [[NSViewController alloc] init];
-  
-  dummyView = [[NSView alloc] initWithFrame:rect];
-  dummyView.wantsLayer = YES;
-  dummyView.layer.backgroundColor = [NSColor blackColor].CGColor;
+  selectionView = [[SelectionView alloc] init];
+  selectionView.selection = CGRectZero;
+  selectionView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+
+  glView = [[OpenGLView alloc] initWithFrame:rect windowDelegate:self];
+  [glView.layer setMasksToBounds:YES];
+
+  dummyView = [[NSVisualEffectView alloc] initWithFrame:rect];
+  [dummyView setMaterial:NSVisualEffectMaterialAppearanceBased];
+  [dummyView setBlendingMode:NSVisualEffectBlendingModeBehindWindow];
+  [dummyView setState:NSVisualEffectStateActive];
   dummyView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
   NSTextView* textView = [[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, 250, 0)];
@@ -49,27 +65,39 @@ static Window* nativePiP = nil;
   [textView setString:@"Right click anywhere on the window"];
   [textView setEditable:NO];
   [textView setSelectable:NO];
-  [textView setTextColor:[NSColor whiteColor]];
+  [textView setTextColor:[NSColor blackColor]];
   [textView setAlignment:NSTextAlignmentCenter];
-  [textView setBackgroundColor:[NSColor blackColor]];
+  [textView setBackgroundColor:[NSColor clearColor]];
   [textView setAutoresizingMask: NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin];
-
   [dummyView addSubview: textView];
 
-  selectionView = [[SelectionView alloc] init];
-  selectionView.selection = CGRectZero;
-  selectionView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-
-  glView = [[OpenGLView alloc] initWithFrame:rect windowDelegate:self];
-  [glView setWantsLayer: YES];
-  [glView.layer setCornerRadius: 5];
-  [glView.layer setMasksToBounds:YES];
-  [glView setSubviews:@[dummyView]];
-  [nvc setView:glView];
-
+  nvc = [[NSViewController alloc] init];
+  [nvc setView:dummyView];
   [self setContentViewController:nvc];
+  NSTrackingAreaOptions nstopts = NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways | NSTrackingInVisibleRect | NSTrackingAssumeInside;
+  NSTrackingArea *nstArea = [[NSTrackingArea alloc] initWithRect:[[self contentView] frame] options:nstopts owner:self userInfo:nil];
+
+  [glView addTrackingArea:nstArea];
+  [dummyView addTrackingArea:nstArea];
+
+  [self setOnwer:@"PiP" withTitle:@"empty"];
+
+  [self onMouseEnter:false];
+  [[[[self standardWindowButton:NSWindowCloseButton] superview] layer] setBackgroundColor:[[[NSColor blackColor] colorWithAlphaComponent:0.1] CGColor]];
 
   return self;
+}
+
+- (void)setOnwer:(NSString*)owner withTitle:(NSString*) title{
+  [self setTitle:[NSString localizedStringWithFormat:@"%@ - %@", owner, title]];
+}
+
+- (void)mouseEntered:(NSEvent *)event{
+  [self onMouseEnter:true];
+}
+
+- (void)mouseExited:(NSEvent *)event{
+  [self onMouseEnter:false];
 }
 
 - (void) startPiP{
@@ -99,7 +127,8 @@ static Window* nativePiP = nil;
 }
 
 - (void)onPiPResize{
-  if(pvc) [self setContentSize:[[[pvc view] window] frame].size];
+  NSView* view = [pvc view];
+  if(pvc) [self setContentSize:[view frame].size];
 }
 
 - (void) setSize:(CGSize)size andAspectRatio:(CGSize) ar{
@@ -129,6 +158,10 @@ static Window* nativePiP = nil;
     window_id = 0;
 }
 
+- (void)onMouseEnter:(BOOL)value{  
+  [[[[self standardWindowButton:NSWindowCloseButton] superview] animator] setAlphaValue:value];
+}
+
 - (void)rightMouseDown:(NSEvent *)theEvent { 
   int layer = -1, index = 0;
   uint32_t windowId = 0;
@@ -152,8 +185,12 @@ static Window* nativePiP = nil;
 
   if(window_id != 0){
     NSMenuItem* item = [theMenu addItemWithTitle:@"clear window" action:@selector(changeWindow:) keyEquivalent:@""];
-    [item setTag:0];
     [item setTarget:self];
+    WindowSel* sel = [[WindowSel alloc] init];
+    sel.owner = @"PiP";
+    sel.title = @"empty";
+    sel.winId = 0;
+    [item setRepresentedObject:sel];
   }
 
   if(!pvc){
@@ -185,7 +222,10 @@ static Window* nativePiP = nil;
     CFNumberGetValue(id_ref, kCFNumberIntType, &windowId);
     CFNumberGetValue(window_layer, kCFNumberIntType, &layer);
 
+    
+//    NSLog(@"app:%@, window: %@, layer:%d", (__bridge NSString*)owner_ref, (__bridge NSString*)name_ref, layer);
     if(layer != 0) continue;
+    
 
     CGImageRef window_image = CGWindowListCreateImage(CGRectNull, kCGWindowListOptionIncludingWindow, windowId, kCGWindowImageNominalResolution | kCGWindowImageBoundsIgnoreFraming);
     if(window_image == NULL) continue;
@@ -205,7 +245,12 @@ static Window* nativePiP = nil;
 
     NSMenuItem* item = [theMenu addItemWithTitle:windowTitle action:@selector(changeWindow:) keyEquivalent:@""];
     [item setTarget:self];
-    [item setTag:windowId];
+    
+    WindowSel* sel = [[WindowSel alloc] init];
+    sel.owner = (__bridge NSString*)owner_ref;
+    sel.title = (__bridge NSString*)name_ref;
+    sel.winId = windowId;
+    [item setRepresentedObject:sel];
     index += 1;
   }
 
@@ -224,14 +269,13 @@ static Window* nativePiP = nil;
 }
 
 - (void)changeWindow:(id)sender{
-  window_id = (CGWindowID)[sender tag];
+  WindowSel* sel = [sender representedObject];
+  window_id = sel.winId;
   selectionView.selection = CGRectZero;
-  if(window_id == 0){
-    [dummyView setFrame:[glView bounds]];
-    [self.contentView setSubviews:@[dummyView]];
-  }
-  else
-    [dummyView removeFromSuperview];
+  if(window_id == 0) [nvc setView:dummyView];
+  else [nvc setView:glView];
+  
+  [self setOnwer:sel.owner withTitle:sel.title];
 }
 
 - (void)selectRegion:(id)sender{

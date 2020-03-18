@@ -6,7 +6,6 @@
 void initGL(void);
 
 @protocol WindowDelegate <NSObject>
-- (void)rightMouseDown:(NSEvent *)theEvent;
 - (void)setSize:(CGSize) size andAspectRatio:(CGSize) ar;
 @end
 

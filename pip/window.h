@@ -16,16 +16,15 @@
 @interface Window : NSWindow<NSWindowDelegate, WindowDelegate, PIPViewControllerDelegate>{
     NSTimer* timer;
     CGWindowID window_id;
-    NSView* dummyView;
+    NSVisualEffectView* dummyView;
     OpenGLView* glView;
     NSViewController* nvc;
     PIPViewController* pvc;
     SelectionView* selectionView;
 }
 
-- (void) start;
-- (void) setScale:(NSInteger) scale;
-- (void) rightMouseDown:(NSEvent *) theEvent;
+- (void)start;
+- (void)setScale:(NSInteger) scale;
 
 @end
 #endif /* Window_h */
