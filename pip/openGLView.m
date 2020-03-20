@@ -166,10 +166,12 @@ void initGL(){
     return NO;
 }
 
-- (void) drawImage: (CGImageRef) cgimage withRect:(CGRect) rect{
+- (bool) drawImage: (CGImageRef) cgimage withRect:(CGRect) rect{
     CIImage* myCIImage = [CIImage imageWithCGImage:cgimage];
     
     CGRect imgRect = [myCIImage extent];
+  
+    if(imgRect.size.height == 1 && imgRect.size.width == 1) return false;
 
     if(rect.size.width == 0){
         imageRect = imgRect;
@@ -209,6 +211,8 @@ void initGL(){
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
     
     [self setNeedsDisplay:YES];
+  
+    return true;
 }
 
 - (void) setScale:(NSInteger) _scale{

@@ -13,17 +13,28 @@
 #import "openGLView.h"
 #import "selectionView.h"
 
+@interface WindowViewController : NSViewController
+@property (nonatomic) id<WindowDelegate> windowDelgate;
+@end
+
+@interface VisualEffectView : NSVisualEffectView
+@end
+
 @interface Window : NSWindow<NSWindowDelegate, WindowDelegate, PIPViewControllerDelegate>{
-    NSTimer* timer;
-    CGWindowID window_id;
-    NSVisualEffectView* dummyView;
-    OpenGLView* glView;
-    NSViewController* nvc;
-    PIPViewController* pvc;
-    SelectionView* selectionView;
+  NSTimer* timer;
+  int refreshRate;
+  bool shouldClose;
+  bool isPipCLosing;
+  NSTextView* textView;
+  CGWindowID window_id;
+  VisualEffectView* dummyView;
+  OpenGLView* glView;
+  PIPViewController* pvc;
+  WindowViewController* nvc;
+  SelectionView* selectionView;
 }
 
-- (void)start;
+- (void)toggleNativePip;
 - (void)setScale:(NSInteger) scale;
 
 @end

@@ -11,11 +11,11 @@
 
 #import <Cocoa/Cocoa.h>
 
-@class PIPViewController;
+@class PIPViewController, CAContext, PIPPanel;
 
 @protocol PIPViewControllerDelegate <NSObject>
-
 @optional
+- (BOOL)pipShouldClose:(PIPViewController *)pip;
 - (void)pipActionStop:(PIPViewController *)pip;
 - (void)pipActionPause:(PIPViewController *)pip;
 - (void)pipActionPlay:(PIPViewController *)pip;
@@ -25,20 +25,19 @@
 @end
 
 @interface PIPViewController : NSViewController
-
-@property (nonatomic, weak) id <PIPViewControllerDelegate> delegate;
-@property (nonatomic, assign) NSRect replacementRect;
+@property (nonatomic) bool playing;
+@property (nonatomic) bool userCanResize;
+@property (nonatomic) NSSize aspectRatio;
+@property (nonatomic) _Bool useAutoLayout;
+@property (nonatomic) _Bool presentOnResize;
+//@property (nonatomic) struct CGRect bounds;
+@property (nonatomic) NSRect replacementRect;
+@property (retain, nonatomic) PIPPanel *panel;
+@property (retain, nonatomic) CAContext *context;
 @property (nonatomic, weak) NSWindow *replacementWindow;
-@property (nonatomic, weak) NSView *replacementView;
-@property (nonatomic, copy) NSString *name;
-@property (nonatomic, assign) NSSize aspectRatio;
+@property (nonatomic, weak) id<PIPViewControllerDelegate> delegate;
 
-- (void)presentViewControllerAsPictureInPicture:(__kindof NSViewController *)controller;
-- (void)performWindowDragWithEvent:(id)arg1;
-- (void)setPlaying:(BOOL)playing;
-- (BOOL)playing;
-
-- (instancetype)init;
+- (void)presentViewControllerAsPictureInPicture:(NSViewController *)viewController;
 
 @end
 

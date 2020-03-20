@@ -6,6 +6,7 @@
 void initGL(void);
 
 @protocol WindowDelegate <NSObject>
+- (void)rightMouseDown:(NSEvent *)theEvent;
 - (void)setSize:(CGSize) size andAspectRatio:(CGSize) ar;
 @end
 
@@ -22,6 +23,6 @@ void initGL(void);
 - (id)initWithFrame:(NSRect)frameRect windowDelegate:(id<WindowDelegate>) delegate;
 - (void) setScale:(NSInteger) scale;
 - (void) drawRect: (NSRect) bounds;
-- (void) drawImage: (CGImageRef) cgimage withRect:(CGRect) rect;
+- (bool) drawImage: (CGImageRef) cgimage withRect:(CGRect) rect;
 @end
 #endif

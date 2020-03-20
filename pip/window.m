@@ -9,8 +9,20 @@
 #import "common.h"
 #import "window.h"
 
-static Window* nativePiP = nil;
-static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable | NSWindowStyleMaskFullSizeContentView | NSWindowStyleMaskUnifiedTitleAndToolbar;
+static CGRect kStartRect = {
+  .origin = {
+    .x = 0,
+    .y = 0,
+  },
+  .size = {
+    .width = kStartSize,
+    .height = kStartSize,
+  },
+};
+
+static Window* nativePip = nil;
+
+static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskBorderless | NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable | NSWindowStyleMaskFullSizeContentView | NSWindowStyleMaskUnifiedTitleAndToolbar;
 
 @interface WindowSel : NSObject{}
 @property (nonatomic) NSString* owner;
@@ -21,24 +33,63 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskTitled | NSWindowStyleM
 @implementation WindowSel
 @end
 
+@implementation VisualEffectView
+- (void)updateLayer{
+//  NSLog(@"updateLayer");
+  [super updateLayer];
+  
+  [CATransaction begin];
+  [CATransaction setDisableActions:YES];
+  
+  CALayer *backdropLayer = self.layer.sublayers.firstObject;
+  
+  if ([backdropLayer.name hasPrefix:@"kCUIVariantMac"]) {
+    for (CALayer *activeLayer in backdropLayer.sublayers) {
+      if ([activeLayer.name isEqualToString:@"Active"]) {
+        for (CALayer *sublayer in activeLayer.sublayers) {
+          if ([sublayer.name isEqualToString:@"Backdrop"]) {
+            for (id filter in sublayer.filters) {
+              if ([filter respondsToSelector:@selector(name)] && [[filter name] isEqualToString:@"blur"]) {
+                if ([filter respondsToSelector:@selector(setValue:forKey:)]) {
+                  [filter setValue:@0.0001 forKey:@"inputRadius"];
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  [CATransaction commit];
+}
+@end
+
+@implementation WindowViewController
+- (void)rightMouseDown:(NSEvent *)theEvent{
+  if(_windowDelgate)[_windowDelgate rightMouseDown:theEvent];
+}
+@end
+
 @implementation Window
 
 - (id) init{
   pvc = nil;
   timer = NULL;
   window_id = 0;
-  NSRect rect = NSMakeRect(0, 0, kStartSize, kStartSize);
+  refreshRate = 30;
+  shouldClose = false;
 
-  self = [super initWithContentRect:rect styleMask:kStyleMaskOnHoverIn backing:NSBackingStoreBuffered defer:YES];
+  self = [super initWithContentRect:kStartRect styleMask:kStyleMaskOnHoverIn backing:NSBackingStoreBuffered defer:YES];
 
-  [self center];
+//  [self center];
   [self setOpaque:NO];
   [self setMovable:YES];
   [self setDelegate:self];
-  [self setAspectRatio:rect.size];
   [self setReleasedWhenClosed:NO];
   [self makeKeyAndOrderFront:self];
   [self setShowsResizeIndicator:NO];
+  [self setContentSize:kStartRect.size];
+  [self setAspectRatio:kStartRect.size];
   [self setLevel: NSFloatingWindowLevel];
   [self setMovableByWindowBackground:YES];
   [self setTitlebarAppearsTransparent:true];
@@ -46,50 +97,46 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskTitled | NSWindowStyleM
   [self setMaxSize:[[self screen] visibleFrame].size];
   [self setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameAqua]];
 
-
   selectionView = [[SelectionView alloc] init];
   selectionView.selection = CGRectZero;
   selectionView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
-  glView = [[OpenGLView alloc] initWithFrame:rect windowDelegate:self];
-  [glView.layer setMasksToBounds:YES];
+  glView = [[OpenGLView alloc] initWithFrame:kStartRect windowDelegate:self];
+  glView.autoresizingMask = NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin;
+  [glView setHidden:true];
 
-  dummyView = [[NSVisualEffectView alloc] initWithFrame:rect];
+  dummyView = [[VisualEffectView alloc] initWithFrame:kStartRect];
   [dummyView setMaterial:NSVisualEffectMaterialAppearanceBased];
   [dummyView setBlendingMode:NSVisualEffectBlendingModeBehindWindow];
   [dummyView setState:NSVisualEffectStateActive];
-  dummyView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+  dummyView.autoresizingMask = NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin;
+//  [dummyView setWantsLayer:YES];
+//  [dummyView setNeedsLayout:YES];
 
-  NSTextView* textView = [[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, 250, 0)];
-  [textView setFrameOrigin:NSMakePoint((NSWidth([dummyView bounds]) - NSWidth([textView frame])) / 2, (NSHeight([dummyView bounds]) - NSHeight([textView frame])) / 2)];
-  [textView setString:@"Right click anywhere on the window"];
-  [textView setEditable:NO];
-  [textView setSelectable:NO];
-  [textView setTextColor:[NSColor blackColor]];
-  [textView setAlignment:NSTextAlignmentCenter];
-  [textView setBackgroundColor:[NSColor clearColor]];
-  [textView setAutoresizingMask: NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin];
-  [dummyView addSubview: textView];
-
-  nvc = [[NSViewController alloc] init];
+  nvc = [[WindowViewController alloc] init];
+  [nvc setWindowDelgate:self];
   [nvc setView:dummyView];
   [self setContentViewController:nvc];
+
+  [[nvc view] addSubview:glView];
+  
   NSTrackingAreaOptions nstopts = NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways | NSTrackingInVisibleRect | NSTrackingAssumeInside;
   NSTrackingArea *nstArea = [[NSTrackingArea alloc] initWithRect:[[self contentView] frame] options:nstopts owner:self userInfo:nil];
 
-  [glView addTrackingArea:nstArea];
+//  [glView addTrackingArea:nstArea];
   [dummyView addTrackingArea:nstArea];
 
-  [self setOnwer:@"PiP" withTitle:@"empty"];
+  [self setOnwer:@"PiP" withTitle:@"(right click to begin)"];
 
   [self onMouseEnter:false];
-  [[[[self standardWindowButton:NSWindowCloseButton] superview] layer] setBackgroundColor:[[[NSColor blackColor] colorWithAlphaComponent:0.1] CGColor]];
+//  [[[[self standardWindowButton:NSWindowCloseButton] superview] layer] setBackgroundColor:[[[NSColor blackColor] colorWithAlphaComponent:0.1] CGColor]];
 
   return self;
 }
 
 - (void)setOnwer:(NSString*)owner withTitle:(NSString*) title{
-  [self setTitle:[NSString localizedStringWithFormat:@"%@ - %@", owner, title]];
+  if(window_id) [self setTitle:@""];
+  else [self setTitle:[NSString localizedStringWithFormat:@"%@ - %@", owner, title]];
 }
 
 - (void)mouseEntered:(NSEvent *)event{
@@ -100,30 +147,93 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskTitled | NSWindowStyleM
   [self onMouseEnter:false];
 }
 
-- (void) startPiP{
-  if(nativePiP) [nativePiP stopPip];
-  pvc = [[PIPViewController alloc] init];
-  [pvc setDelegate:self];
-  [pvc presentViewControllerAsPictureInPicture:nvc];
-  [pvc setAspectRatio:[self aspectRatio]];
-  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onPiPResize) name:NSWindowDidResizeNotification object:[[pvc view] window]];
-  [self setIsVisible:false];
-  nativePiP = self;
+- (void) toggleNativePip{
+  if(isPipCLosing) return;
+  if(pvc){
+    [self pipActionReturn:pvc];
+    [self pipWillClose:pvc];
+  }
+  else [self startPiP];
 }
 
-- (void)stopPip{
+- (void)resetPlaybackSate{
+  if(pvc) pvc.playing = !!timer;
+}
+
+- (void) startPiP{
+//  NSLog(@"startPiP");
+  if(nativePip)[nativePip toggleNativePip];
+  bool doingAgain = false;
+  doAgain:
+  @try{
+    pvc = [[PIPViewController alloc] init];
+    [pvc setDelegate:self];
+    [pvc presentViewControllerAsPictureInPicture:nvc];
+    [pvc setAspectRatio:[self aspectRatio]];
+//    [pvc setUserCanResize:true];
+//    [pvc setUseAutoLayout:true];
+//    [pvc setPresentOnResize:true];
+    [self resetPlaybackSate];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onPiPResize) name:NSWindowDidResizeNotification object:[[pvc view] window]];
+    [self setIsVisible:false];
+    nativePip = self;
+  }
+  @catch(NSException* err){
+//    NSLog(@"startPiP err %@", err);
+    [self stopPip:true];
+    if(!doingAgain){
+      doingAgain = true;
+      goto doAgain;
+    }
+  }
+}
+
+- (void)stopPip:(bool) force{
+  if(!pvc) return;
+//  NSLog(@"stopPip %d", force);
+  [pvc setDelegate:nil];
+  if(force) [pvc dismissViewController:nvc];
+  [self setContentViewController:nil];
+  [self setContentViewController:nvc];
+  if(self == nativePip) nativePip = nil;
+  [self setIsVisible:true];
+  pvc = nil;
+}
+
+- (void)pipActionStop:(PIPViewController *)pip{
+//  NSLog(@"pipActionStop");
+  shouldClose = true;
+}
+
+- (void)pipActionPause:(PIPViewController *)pip{
+//  NSLog(@"pipActionPause");
+  [self stopTimer];
+}
+
+- (void)pipActionPlay:(PIPViewController *)pip{
+//  NSLog(@"pipActionPlay");
+  if(window_id) [self startTimer:1.0/refreshRate];
+  else [self stopTimer];
+}
+
+- (void)pipActionReturn:(PIPViewController *)pip{
+//  NSLog(@"pipActionReturn");
+  shouldClose = false;
+  [pip setReplacementWindow:nil];
+  [pip setReplacementRect:[self frame]];
+}
+
+- (void)pipWillClose:(PIPViewController *)pip{
+//  NSLog(@"pipWillClose");
+  isPipCLosing = true;
   [pvc dismissViewController:nvc];
-  [self pipDidClose:pvc];
 }
 
 - (void)pipDidClose:(PIPViewController *)pip{
-  if(!pvc) return;
-  [pvc setDelegate:nil];
-  pvc = nil;
-  [self setIsVisible:true];
-  [self setContentViewController:nil];
-  [self setContentViewController:nvc];
-  if(nativePiP == self) nativePiP = nil;
+//  NSLog(@"pipDidClose");
+  isPipCLosing = false;
+  [self stopPip:false];
+  if(shouldClose)[self close];
 }
 
 - (void)onPiPResize{
@@ -132,30 +242,69 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskTitled | NSWindowStyleM
 }
 
 - (void) setSize:(CGSize)size andAspectRatio:(CGSize) ar{
-  [self setAspectRatio:ar];
-  [self setContentSize:size];
-  if(pvc) [pvc setAspectRatio:ar];
+  if(window_id == 0) return;
+  if(pvc){
+    [pvc setAspectRatio:ar];
+    [[pvc view] setFrameSize:size];
+    [[[pvc view] window] setContentSize:size];
+  }
+  else{
+    [self setAspectRatio:ar];
+    [self setContentSize:size];
+  }
+//  if(pvc) [[nvc view] setFrameSize:size];
 }
 
 - (BOOL) canBecomeKeyWindow{
   return YES;
 }
 
-- (void) start{
-  if(timer != NULL) return;
-  timer = [NSTimer timerWithTimeInterval:0.03f target:self selector:@selector(captrue:) userInfo:nil repeats:YES];
-  [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
+- (void)stopTimer{
+  if(timer) [timer invalidate];
+  timer = nil;
+  [self resetPlaybackSate];
 }
 
-- (void)captrue:(NSTimer *)timer{
+- (void)startTimer:(double)interval{
+//  NSLog(@"startTimer %f", interval);
+  [self stopTimer];
+  timer = [NSTimer timerWithTimeInterval:interval target:self selector:@selector(captrue) userInfo:nil repeats:YES];
+  [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
+  [self resetPlaybackSate];
+}
+
+- (void)captrue{
   if(window_id == 0) return;
   CGImageRef window_image = CGWindowListCreateImage(CGRectNull, kCGWindowListOptionIncludingWindow, window_id, kCGWindowImageNominalResolution | kCGWindowImageBoundsIgnoreFraming);
   if(window_image != NULL){
-    [glView drawImage:window_image withRect:selectionView.selection];
+    bool rc = [glView drawImage:window_image withRect:selectionView.selection];
     CGImageRelease(window_image);
+    if(rc){
+      if(timer && [timer timeInterval] != 1.0/refreshRate) [self startTimer:1.0/refreshRate];
+      return;
+    }
+
+    CGWindowID _windowArr[] = { window_id };
+    CFArrayRef windowArr = CFArrayCreate(NULL, (const void **) _windowArr, 1, NULL);
+    CFArrayRef result = CGWindowListCreateDescriptionFromArray(windowArr);
+    CFRelease(windowArr);
+
+    if (result && CFArrayGetCount(result) == sizeof(_windowArr)/sizeof(CGWindowID)){
+      CFRelease(result);
+      if(timer && [timer timeInterval] != 1.0) [self startTimer:1.0];
+      return;
+    }
+    if(result) CFRelease(result);
   }
-  else
-    window_id = 0;
+
+  NSMenuItem* item = [[NSMenuItem alloc] init];
+  [item setTarget:self];
+  WindowSel* sel = [[WindowSel alloc] init];
+  sel.owner = @"PiP";
+  sel.title = @"(right click to begin)";
+  sel.winId = 0;
+  [item setRepresentedObject:sel];
+  [self changeWindow:item];
 }
 
 - (void)onMouseEnter:(BOOL)value{  
@@ -179,7 +328,7 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskTitled | NSWindowStyleM
     }
   }
   else{
-    NSMenuItem* item = [theMenu addItemWithTitle:@"exit native pip" action:@selector(stopPip) keyEquivalent:@""];
+    NSMenuItem* item = [theMenu addItemWithTitle:@"exit native pip" action:@selector(toggleNativePip) keyEquivalent:@""];
     [item setTarget:self];
   }
 
@@ -188,7 +337,7 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskTitled | NSWindowStyleM
     [item setTarget:self];
     WindowSel* sel = [[WindowSel alloc] init];
     sel.owner = @"PiP";
-    sel.title = @"empty";
+    sel.title = @"(right click to begin)";
     sel.winId = 0;
     [item setRepresentedObject:sel];
   }
@@ -221,11 +370,9 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskTitled | NSWindowStyleM
 
     CFNumberGetValue(id_ref, kCFNumberIntType, &windowId);
     CFNumberGetValue(window_layer, kCFNumberIntType, &layer);
-
     
 //    NSLog(@"app:%@, window: %@, layer:%d", (__bridge NSString*)owner_ref, (__bridge NSString*)name_ref, layer);
     if(layer != 0) continue;
-    
 
     CGImageRef window_image = CGWindowListCreateImage(CGRectNull, kCGWindowListOptionIncludingWindow, windowId, kCGWindowImageNominalResolution | kCGWindowImageBoundsIgnoreFraming);
     if(window_image == NULL) continue;
@@ -270,26 +417,26 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskTitled | NSWindowStyleM
 
 - (void)changeWindow:(id)sender{
   WindowSel* sel = [sender representedObject];
+
   window_id = sel.winId;
   selectionView.selection = CGRectZero;
-  if(window_id == 0) [nvc setView:dummyView];
-  else [nvc setView:glView];
-  
+  [glView setHidden:window_id == 0];
   [self setOnwer:sel.owner withTitle:sel.title];
+
+  if(window_id)[self startTimer:1.0/refreshRate];
+  else [self stopTimer];
 }
 
 - (void)selectRegion:(id)sender{
   [self setMovable:NO];
   [selectionView setFrameSize:NSMakeSize(glView.bounds.size.width, glView.bounds.size.height)];
-  [self.contentView setSubviews:@[selectionView]];
+  [self.contentView addSubview:selectionView];
   [[NSCursor crosshairCursor] set];
 }
 
 - (void)close{
-  if(nativePiP == self){
-    [nativePiP stopPip];
-    return;
-  }
+  NSLog(@"close window");
+  [self stopPip:true];
 
   if(timer) [timer invalidate];
 

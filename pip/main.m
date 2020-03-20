@@ -27,6 +27,8 @@
     NSMenu* appMenu = [[NSMenu alloc] initWithTitle:appName];
     NSMenu* windowMenu = [[NSMenu alloc] initWithTitle:@"Window"];
 
+    [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"About PiP" action:@selector(orderFrontStandardAboutPanel:) keyEquivalent:@""]];
+
     [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"New" action:@selector(newWindow) keyEquivalent:@"n"]];
     [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"Click Through" action:@selector(clickThrough:) keyEquivalent:@"c"]];
     [appMenu addItem:[NSMenuItem separatorItem]];
@@ -42,6 +44,7 @@
     [self addScaleMenuItemWithTitle:@"Scale 1/4x" keyEquivalent:@"4" mask:YES andScale:100/4 toMenu:windowMenu];
     [windowMenu addItem:[NSMenuItem separatorItem]];
     [windowMenu addItem:[[NSMenuItem alloc] initWithTitle:@"Close Current" action:@selector(closeWindow) keyEquivalent:@"w"]];
+    [windowMenu addItem:[[NSMenuItem alloc] initWithTitle:@"Toggle Native PiP" action:@selector(toggleNativePip) keyEquivalent:@"p"]];
 
     windowMenuItem = [[NSMenuItem alloc] init];
     NSMenuItem* appMenuItem = [[NSMenuItem alloc] init];
@@ -69,40 +72,48 @@
     [app run];
 }
 
-- (void) closeWindow{
-  Window* currentWindow = (Window*)[app keyWindow];
-  if(![currentWindow isKindOfClass:[NSWindow class]]){
+- (void) getActiveWindow: (void (^)(Window* window))cb{
+  NSWindow* currentWindow = (NSWindow*)[app keyWindow];
+  if(!currentWindow || ![currentWindow isKindOfClass:[Window class]]){
     currentWindow = NULL;
     for(NSWindow* window in [app windows]){
-      if([window isKindOfClass:[NSWindow class]]){
+      if([window isKindOfClass:[Window class]]){
         currentWindow = (Window*)window;
         break;
       }
     }
   }
-  if(currentWindow){
-    [currentWindow close];
-    [app removeWindowsItem:currentWindow];
-  }
+  if(currentWindow) cb((Window*)currentWindow);
+}
+
+- (void) closeWindow{
+  [self getActiveWindow: ^(Window* window){
+    [window close];
+    [app removeWindowsItem:window];
+  }];
   [windowMenuItem setEnabled:[[app windows] count] > 1];
 //  NSLog(@"closeWindow wc: %lu", [[app windows] count]);
 }
 
 - (void) newWindow{
-    Window* window = [[Window alloc] init];
-    [window start];
-    [window setIgnoresMouseEvents:clickThroughState];
+    [[[Window alloc] init] setIgnoresMouseEvents:clickThroughState];
     [windowMenuItem setEnabled:YES];
 //    NSLog(@"newWindow wc: %lu", [[app windows] count]);
 }
 
+- (void) toggleNativePip{
+  [self getActiveWindow: ^(Window* window){
+    [window toggleNativePip];
+  }];
+}
+
 - (void) hideAll{
-    [app hide:nil];
+    [app hide:self];
 }
 
 - (void) setScale:(id)sender{
-  Window* currentWindow = (Window*)[app keyWindow];
-  if(currentWindow) [currentWindow setScale:[sender tag]];
+  NSWindow* currentWindow = (NSWindow*)[app keyWindow];
+  if(currentWindow && [currentWindow isKindOfClass:[Window class]]) [(Window*)currentWindow setScale:[sender tag]];
 }
 
 -(void) clickThrough:(id)sender{
