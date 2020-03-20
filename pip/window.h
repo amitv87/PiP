@@ -17,17 +17,28 @@
 @property (nonatomic) id<WindowDelegate> windowDelgate;
 @end
 
-@interface VisualEffectView : NSVisualEffectView
+@class Button;
+@protocol ButtonDelegate <NSObject>
+- (void) onClick:(Button*)button;
 @end
 
-@interface Window : NSWindow<NSWindowDelegate, WindowDelegate, PIPViewControllerDelegate>{
+@interface Button : NSVisualEffectView
+@property (nonatomic) id<ButtonDelegate> delegate;
+- (id) initWithRadius:(int)radius andImage:(NSImage*) img;
+- (void) setImage:(NSImage*) img;
+@end
+
+@interface Window : NSWindow<NSWindowDelegate, WindowDelegate, ButtonDelegate, PIPViewControllerDelegate>{
   NSTimer* timer;
+  NSView* butCont;
+  Button* popbutt;
+  Button* playbutt;
   int refreshRate;
   bool shouldClose;
   bool isPipCLosing;
   NSTextView* textView;
   CGWindowID window_id;
-  VisualEffectView* dummyView;
+  NSVisualEffectView* dummyView;
   OpenGLView* glView;
   PIPViewController* pvc;
   WindowViewController* nvc;

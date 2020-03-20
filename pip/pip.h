@@ -11,7 +11,7 @@
 
 #import <Cocoa/Cocoa.h>
 
-@class PIPViewController, CAContext, PIPPanel;
+@class PIPViewController;
 
 @protocol PIPViewControllerDelegate <NSObject>
 @optional
@@ -26,14 +26,9 @@
 
 @interface PIPViewController : NSViewController
 @property (nonatomic) bool playing;
-@property (nonatomic) bool userCanResize;
 @property (nonatomic) NSSize aspectRatio;
-@property (nonatomic) _Bool useAutoLayout;
-@property (nonatomic) _Bool presentOnResize;
-//@property (nonatomic) struct CGRect bounds;
+@property (nonatomic) bool userCanResize;
 @property (nonatomic) NSRect replacementRect;
-@property (retain, nonatomic) PIPPanel *panel;
-@property (retain, nonatomic) CAContext *context;
 @property (nonatomic, weak) NSWindow *replacementWindow;
 @property (nonatomic, weak) id<PIPViewControllerDelegate> delegate;
 

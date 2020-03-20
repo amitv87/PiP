@@ -8,6 +8,13 @@
 
 #import "common.h"
 #import "window.h"
+#import "img.h"
+
+#define pop_icon @"/Volumes/awsm/PiP/pop.png"
+#define play_icon @"/Volumes/awsm/PiP/play.png"
+#define pause_icon @"/Volumes/awsm/PiP/pause.png"
+
+#define GET_IMG(x) [[NSImage alloc] initWithData:[NSData dataWithBytes:img_##x##_png length:img_##x##_png_len]]
 
 static CGRect kStartRect = {
   .origin = {
@@ -33,35 +40,64 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskBorderless | NSWindowSt
 @implementation WindowSel
 @end
 
-@implementation VisualEffectView
-- (void)updateLayer{
-//  NSLog(@"updateLayer");
-  [super updateLayer];
-  
-  [CATransaction begin];
-  [CATransaction setDisableActions:YES];
-  
-  CALayer *backdropLayer = self.layer.sublayers.firstObject;
-  
-  if ([backdropLayer.name hasPrefix:@"kCUIVariantMac"]) {
-    for (CALayer *activeLayer in backdropLayer.sublayers) {
-      if ([activeLayer.name isEqualToString:@"Active"]) {
-        for (CALayer *sublayer in activeLayer.sublayers) {
-          if ([sublayer.name isEqualToString:@"Backdrop"]) {
-            for (id filter in sublayer.filters) {
-              if ([filter respondsToSelector:@selector(name)] && [[filter name] isEqualToString:@"blur"]) {
-                if ([filter respondsToSelector:@selector(setValue:forKey:)]) {
-                  [filter setValue:@0.0001 forKey:@"inputRadius"];
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  [CATransaction commit];
+bool isInside(int rad, CGPoint cirlce, CGPoint point){
+  if ((point.x - cirlce.x) * (point.x - cirlce.x) + (point.y - cirlce.y) * (point.y - cirlce.y) <= rad * rad) return true;
+  else return false;
 }
+
+@implementation Button{
+  int radius;
+  bool wasMouseDown;
+  NSImageView* view;
+}
+- (id) initWithRadius:(int)rad andImage:(NSImage*) img{
+  wasMouseDown = false;
+  radius = rad;
+  self = [super initWithFrame:NSMakeRect(0, 0, radius * 2, radius * 2)];
+  self.wantsLayer = true;
+  self.layer.masksToBounds = true;
+  self.layer.cornerRadius = radius;
+  view = [[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, radius * 2, radius * 2)];
+  [self setImage:img];
+  [self addSubview:view];
+  self.state = NSVisualEffectStateActive;
+  self.material = NSVisualEffectMaterialTitlebar;
+  self.blendingMode = NSVisualEffectBlendingModeWithinWindow ;
+  return self;
+}
+
+- (void) setImage:(NSImage*) img{
+  [img setSize:NSMakeSize(radius * 1.25, radius * 1.25)];
+  [view setImage:img];
+}
+
+- (void)mouseDown:(NSEvent *)event{
+  [self onMouse:true withEvent:event];
+}
+
+- (void)mouseUp:(NSEvent *)event{
+  [self onMouse:false withEvent:event];
+}
+
+- (void)onMouse:(bool)down withEvent:(NSEvent *)event{
+  NSPoint loc = [self convertPoint:[event locationInWindow] fromView:nil];
+  CGFloat radius = self.layer.cornerRadius;
+  CGPoint circle = NSMakePoint(radius, radius);
+  bool isValid = isInside(radius, circle, loc);
+//  NSLog(@"onMouse %d,in: %d, cirlce: %f x %f, loc: %f x %f", down, isValid, circle.x, circle.y, loc.x, loc.y);
+//  self.material = down && isValid ? NSVisualEffectMaterialLight : NSVisualEffectMaterialTitlebar;
+  
+  if(isValid && down){
+    wasMouseDown = true;
+    self.material = NSVisualEffectMaterialLight;
+  }
+  else{
+    self.material = NSVisualEffectMaterialTitlebar;
+    if(wasMouseDown && isValid) [self.delegate onClick:self];
+    wasMouseDown = false;
+  }
+}
+
 @end
 
 @implementation WindowViewController
@@ -105,13 +141,28 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskBorderless | NSWindowSt
   glView.autoresizingMask = NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin;
   [glView setHidden:true];
 
-  dummyView = [[VisualEffectView alloc] initWithFrame:kStartRect];
+  dummyView = [[NSVisualEffectView alloc] initWithFrame:kStartRect];
   [dummyView setMaterial:NSVisualEffectMaterialAppearanceBased];
   [dummyView setBlendingMode:NSVisualEffectBlendingModeBehindWindow];
   [dummyView setState:NSVisualEffectStateActive];
   dummyView.autoresizingMask = NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin;
-//  [dummyView setWantsLayer:YES];
-//  [dummyView setNeedsLayout:YES];
+
+  butCont = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 150, 40)];
+  [butCont setFrameOrigin:NSMakePoint(round((NSWidth([glView bounds]) - NSWidth([butCont frame])) / 2) , 12)];
+  [butCont setAutoresizingMask:NSViewMinXMargin | NSViewMaxXMargin];
+
+  popbutt = [[Button alloc] initWithRadius:20 andImage:GET_IMG(pop)];
+  [popbutt setDelegate:self];
+  [popbutt setFrameOrigin:NSMakePoint(round((NSWidth([butCont bounds]) - NSWidth([popbutt frame])) / 2) - 27, 0)];
+  [butCont addSubview:popbutt];
+
+  playbutt = [[Button alloc] initWithRadius:20 andImage:GET_IMG(play)];
+  [playbutt setDelegate:self];
+  [playbutt setFrameOrigin:NSMakePoint(round((NSWidth([butCont bounds]) - NSWidth([playbutt frame])) / 2) + 27, 0)];
+
+  [butCont addSubview:playbutt];
+  [butCont setHidden:true];
+  [glView addSubview:butCont];
 
   nvc = [[WindowViewController alloc] init];
   [nvc setWindowDelgate:self];
@@ -123,7 +174,6 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskBorderless | NSWindowSt
   NSTrackingAreaOptions nstopts = NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways | NSTrackingInVisibleRect | NSTrackingAssumeInside;
   NSTrackingArea *nstArea = [[NSTrackingArea alloc] initWithRect:[[self contentView] frame] options:nstopts owner:self userInfo:nil];
 
-//  [glView addTrackingArea:nstArea];
   [dummyView addTrackingArea:nstArea];
 
   [self setOnwer:@"PiP" withTitle:@"(right click to begin)"];
@@ -137,6 +187,14 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskBorderless | NSWindowSt
 - (void)setOnwer:(NSString*)owner withTitle:(NSString*) title{
   if(window_id) [self setTitle:@""];
   else [self setTitle:[NSString localizedStringWithFormat:@"%@ - %@", owner, title]];
+}
+
+- (void) onClick:(Button*)button{
+  if(button == playbutt){
+    if(timer) [self stopTimer];
+    else [self startTimer:1.0/refreshRate];
+  }
+  else if(button == popbutt) [self toggleNativePip];
 }
 
 - (void)mouseEntered:(NSEvent *)event{
@@ -157,7 +215,9 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskBorderless | NSWindowSt
 }
 
 - (void)resetPlaybackSate{
-  if(pvc) pvc.playing = !!timer;
+  if(pvc) pvc.playing = timer;
+  if(timer) [playbutt setImage:GET_IMG(pause)];
+  else [playbutt setImage:GET_IMG(play)];
 }
 
 - (void) startPiP{
@@ -168,18 +228,16 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskBorderless | NSWindowSt
   @try{
     pvc = [[PIPViewController alloc] init];
     [pvc setDelegate:self];
-    [pvc presentViewControllerAsPictureInPicture:nvc];
+    [pvc setUserCanResize:true];
     [pvc setAspectRatio:[self aspectRatio]];
-//    [pvc setUserCanResize:true];
-//    [pvc setUseAutoLayout:true];
-//    [pvc setPresentOnResize:true];
-    [self resetPlaybackSate];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onPiPResize) name:NSWindowDidResizeNotification object:[[pvc view] window]];
-    [self setIsVisible:false];
+    [pvc presentViewControllerAsPictureInPicture:nvc];
     nativePip = self;
+    [self resetPlaybackSate];
+    [self setIsVisible:false];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onPiPResize) name:NSWindowDidResizeNotification object:[[pvc view] window]];
   }
   @catch(NSException* err){
-//    NSLog(@"startPiP err %@", err);
+    NSLog(@"startPiP err %@", err);
     [self stopPip:true];
     if(!doingAgain){
       doingAgain = true;
@@ -195,9 +253,9 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskBorderless | NSWindowSt
   if(force) [pvc dismissViewController:nvc];
   [self setContentViewController:nil];
   [self setContentViewController:nvc];
-  if(self == nativePip) nativePip = nil;
   [self setIsVisible:true];
   pvc = nil;
+  if(self == nativePip) nativePip = nil;
 }
 
 - (void)pipActionStop:(PIPViewController *)pip{
@@ -307,7 +365,8 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskBorderless | NSWindowSt
   [self changeWindow:item];
 }
 
-- (void)onMouseEnter:(BOOL)value{  
+- (void)onMouseEnter:(BOOL)value{
+  [butCont setHidden:pvc || !value];
   [[[[self standardWindowButton:NSWindowCloseButton] superview] animator] setAlphaValue:value];
 }
 
@@ -407,6 +466,7 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskBorderless | NSWindowSt
 }
 
 - (void) setScale:(NSInteger) scale{
+//  NSLog(@"setScale %ld", (long)scale);
   if(window_id > 0) [glView setScale:scale];
 }
 
@@ -435,18 +495,28 @@ static NSUInteger kStyleMaskOnHoverIn = NSWindowStyleMaskBorderless | NSWindowSt
 }
 
 - (void)close{
-  NSLog(@"close window");
+//  NSLog(@"close window");
   [self stopPip:true];
+  [self stopTimer];
+  [self setContentViewController:nil];
 
-  if(timer) [timer invalidate];
+  window_id = 0;
+  popbutt.delegate = NULL;
+  playbutt.delegate = NULL;
+
+  [butCont removeFromSuperview];
+  [popbutt removeFromSuperview];
+  [playbutt removeFromSuperview];
+  [selectionView removeFromSuperview];
 
   nvc = NULL;
   timer = NULL;
   glView = NULL;
-  window_id = 0;
+  butCont = NULL;
+  popbutt = NULL;
+  playbutt = NULL;
   dummyView = NULL;
   selectionView = NULL;
-  [self setContentViewController:nil];
   
   [super close];
 }
