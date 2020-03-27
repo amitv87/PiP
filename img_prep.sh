@@ -1,15 +1,16 @@
 set -ex
-OUT_FILE=pip/img.h
-
-cat /dev/null > $OUT_FILE
+export OUT_FILE=pip/img.h
 
 doImg(){
+  echo "doing $1"
   printf 'static const ' >> $OUT_FILE
-  xxd -i img/$1.png >> $OUT_FILE
+  xxd -i $1 >> $OUT_FILE
 }
 
-doImg pop
-doImg play
-doImg pause
+export -f doImg
+
+
+cat /dev/null > $OUT_FILE
+find img -type f -name '*.png' | xargs -L 1 bash -c 'doImg "$@"' _
 
 cat $OUT_FILE

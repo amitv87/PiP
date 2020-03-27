@@ -12,8 +12,7 @@
 
 #define NSColorFromRGB(rgbValue) [NSColor colorWithCalibratedRed:((float)((rgbValue & 0xFF000000) >> 16))/255.0 green:((float)((rgbValue & 0xFF0000) >> 8))/255.0 blue:((float)(rgbValue & 0xFF00))/255.0 alpha:((float)(rgbValue & 0xFF))/255.0]
 
-- (void)mouseDown:(NSEvent *)theEvent
-{
+- (void)mouseDown:(NSEvent *)theEvent{
     self.startPoint = [self convertPoint:[theEvent locationInWindow] fromView:nil];
 
     self.shapeLayer = [CAShapeLayer layer];
@@ -35,9 +34,11 @@
     [self.shapeLayer addAnimation:dashAnimation forKey:@"linePhase"];
 }
 
-- (void)mouseDragged:(NSEvent *)theEvent
-{
+- (void)mouseDragged:(NSEvent *)theEvent{
+    if(!NSPointInRect([theEvent locationInWindow], [self frame])) return;
     NSPoint point = [self convertPoint:[theEvent locationInWindow] fromView:nil];
+  
+    self.endPoint = point;
 
     CGMutablePathRef path = CGPathCreateMutable();
     CGPathMoveToPoint(path, NULL, self.startPoint.x, self.startPoint.y);
@@ -51,13 +52,12 @@
 }
 
 - (void)mouseUp:(NSEvent *)theEvent{
-    self.endPoint = [self convertPoint:[theEvent locationInWindow] fromView:nil];
-    float left = self.startPoint.x < self.endPoint.x ? self.startPoint.x : self.endPoint.x;
-    float top = self.startPoint.y < self.endPoint.y ? self.startPoint.y : self.endPoint.y;
+    float x = self.startPoint.x < self.endPoint.x ? self.startPoint.x : self.endPoint.x;
+    float y = self.startPoint.y < self.endPoint.y ? self.startPoint.y : self.endPoint.y;
     float width = fabs(-self.startPoint.x + self.endPoint.x);
     float height = fabs(-self.startPoint.y + self.endPoint.y);
     
-    self.selection = NSMakeRect(left, top, width, height);
+    self.selection = NSMakeRect(x, y, width, height);
     [self.shapeLayer removeFromSuperlayer];
     self.shapeLayer = nil;
     [self.window setMovable:YES];

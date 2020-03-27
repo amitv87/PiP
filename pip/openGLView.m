@@ -44,8 +44,7 @@ void initGL(){
 
 @implementation OpenGLView
 
-- (id)initWithFrame:(NSRect)frameRect windowDelegate:(id<WindowDelegate>) delegate{
-    
+- (id)initWithFrame:(NSRect)frameRect{
     self = [super initWithFrame:frameRect pixelFormat:pixelFormat];
 
     int VBL = 1;
@@ -55,7 +54,6 @@ void initGL(){
     alreadyCropped = false;
     imageRect = CGRectMake(0,0,200,200);
     imageAspectRatio = 0;
-    windowDelegate = delegate;
     return self;
 }
 
@@ -115,14 +113,14 @@ void initGL(){
         NSRect windowBounds = [[[self window] screen] visibleFrame];
         bounds = NSMakeRect(0, 0, imageRect.size.width * scale / 100, imageRect.size.height * scale / 100);
         if(windowBounds.size.width < bounds.size.width || windowBounds.size.height < bounds.size.height || bounds.size.width < kMinSize || bounds.size.height < kMinSize) goto doNormally;
-        [windowDelegate setSize:bounds.size andAspectRatio:bounds.size];
+        [self.delegate setSize:bounds.size andAspectRatio:bounds.size];
     }
     else{
     doNormally:
         bounds = [self bounds];
         float screenAspectRatio = bounds.size.width / bounds.size.height;
         float arr = imageAspectRatio / screenAspectRatio;
-        if( 0.99 > arr || arr > 1.01) [windowDelegate setSize:NSMakeSize(bounds.size.width, bounds.size.width / imageAspectRatio) andAspectRatio:imageRect.size];
+        if( 0.99 > arr || arr > 1.01) [self.delegate setSize:NSMakeSize(bounds.size.width, bounds.size.width / imageAspectRatio) andAspectRatio:imageRect.size];
     }
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

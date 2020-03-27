@@ -13,13 +13,18 @@
 #import "openGLView.h"
 #import "selectionView.h"
 
-@interface WindowViewController : NSViewController
-@property (nonatomic) id<WindowDelegate> windowDelgate;
-@end
-
 @class Button;
+
 @protocol ButtonDelegate <NSObject>
 - (void) onClick:(Button*)button;
+@end
+
+@protocol RootViewDelegate <NSObject>
+- (void)rightMouseDown:(NSEvent *)theEvent;
+@end
+
+@interface RootView : NSVisualEffectView
+@property (nonatomic) id<RootViewDelegate> delegate;
 @end
 
 @interface Button : NSVisualEffectView
@@ -28,7 +33,7 @@
 - (void) setImage:(NSImage*) img;
 @end
 
-@interface Window : NSWindow<NSWindowDelegate, WindowDelegate, ButtonDelegate, PIPViewControllerDelegate>{
+@interface Window : NSWindow<NSWindowDelegate, RootViewDelegate, GLDelegate, ButtonDelegate, PIPViewControllerDelegate>{
   NSTimer* timer;
   NSView* butCont;
   Button* popbutt;
@@ -36,15 +41,15 @@
   int refreshRate;
   bool shouldClose;
   bool isPipCLosing;
-  NSTextView* textView;
   CGWindowID window_id;
-  NSVisualEffectView* dummyView;
+  RootView* rootView;
   OpenGLView* glView;
+  NSViewController* nvc;
   PIPViewController* pvc;
-  WindowViewController* nvc;
   SelectionView* selectionView;
 }
 
+- (void)togglePlayback;
 - (void)toggleNativePip;
 - (void)setScale:(NSInteger) scale;
 
