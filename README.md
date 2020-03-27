@@ -4,16 +4,23 @@ Always on top window preview similar to the popular windows only OnTopReplica
 
 [![PiP demo](https://img.youtube.com/vi/MDte5sZCRnY/0.jpg)](https://www.youtube.com/watch?v=MDte5sZCRnY)
 
-## Features
+## Code Info
+* Nibless cocoa app
+* OpenGL based renderer
+* CoreGraphics based capturer (looking for alternative)
+* No third party dependency
+* Uses private framework for native pip support
 
+## Features
 * Clone any visibile window
 * Crop the preview
 * Auto and manual resize preserving the aspect ratio
-* Multiple window preview from same process, cmd+n to open and cmd+w to close
+* Multiple window preview from same process, ```cmd+n``` to open and ```cmd+w``` to close
 * Pinch to zoom
+* Native picture in picture support ```cmd+p```
+* Minimal modern UI
 
 ## To do
-
 * Almost all the missing features when compared to [OnTopReplica](https://github.com/LorenzCK/OnTopReplica)
 
 ## Installation
