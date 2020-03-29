@@ -218,19 +218,4 @@ void initGL(){
     setScaleOnce = true;
 }
 
-- (void)magnifyWithEvent:(NSEvent *)event{
-    NSRect bounds = [self bounds];
-    NSRect windowBounds = [[[self window] screen] visibleFrame];
-
-    float factor = [event magnification];
-    float width = bounds.size.width + (bounds.size.width * factor);
-    float height = bounds.size.height + (bounds.size.height * factor);
-    if(windowBounds.size.width < width || windowBounds.size.height < height || width < kMinSize || height < kMinSize) return;
-
-    NSRect windowRect = [[self window] frame];
-    windowRect.size.width = width;
-    windowRect.size.height = height;
-    [self.window setFrame:windowRect display:YES];
-}
-
 @end

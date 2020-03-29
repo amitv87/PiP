@@ -125,9 +125,26 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
 @end
 
 @implementation RootView
+
 - (void)rightMouseDown:(NSEvent *)theEvent{
   if(self.delegate)[self.delegate rightMouseDown:theEvent];
 }
+
+- (void)magnifyWithEvent:(NSEvent *)event{
+  NSRect bounds = [self bounds];
+  NSRect windowBounds = [[self.window screen] visibleFrame];
+
+  float factor = [event magnification];
+  float width = bounds.size.width + (bounds.size.width * factor);
+  float height = bounds.size.height + (bounds.size.height * factor);
+  if(windowBounds.size.width < width || windowBounds.size.height < height || width < kMinSize || height < kMinSize) return;
+
+  NSRect windowRect = [[self window] frame];
+  windowRect.size.width = width;
+  windowRect.size.height = height;
+  [self.window setFrame:windowRect display:YES];
+}
+
 @end
 
 @implementation Window
@@ -165,16 +182,15 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
 
   glView = [[OpenGLView alloc] initWithFrame:kStartRect];
   glView.delegate = self;
-  glView.wantsLayer = true;
-  glView.layer.masksToBounds = true;
-  [glView setNeedsLayout:true];
+//  glView.wantsLayer = true;
+//  glView.layer.masksToBounds = true;
+//  [glView setNeedsLayout:true];
   glView.autoresizingMask = NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin;
   [glView setHidden:true];
 
-  butCont = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 150, 40)];
-  [butCont setFrameOrigin:NSMakePoint(round((NSWidth([glView bounds]) - NSWidth([butCont frame])) / 2) , 12)];
-  [butCont setAutoresizingMask:NSViewNotSizable | NSViewMinXMargin | NSViewMaxXMargin];
-  [butCont setHidden:true];
+  NSRect butContRect = NSMakeRect(0, 12, 100, 40);
+  butCont = [[NSView alloc] initWithFrame:butContRect];
+  butCont.translatesAutoresizingMaskIntoConstraints = false;
 
   popbutt = [[Button alloc] initWithRadius:20 andImage:GET_IMG(pop)];
   [popbutt setDelegate:self];
@@ -195,7 +211,14 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
 
   [rootView addSubview:glView];
   [rootView addSubview:butCont];
-  
+
+  [rootView addConstraints:@[
+    [NSLayoutConstraint constraintWithItem:butCont attribute:NSLayoutAttributeCenterX relatedBy:NSLayoutRelationEqual toItem:rootView attribute:NSLayoutAttributeCenterX multiplier:1 constant:-butContRect.origin.x],
+    [NSLayoutConstraint constraintWithItem:butCont attribute:NSLayoutAttributeBottom relatedBy:NSLayoutRelationEqual toItem:rootView attribute:NSLayoutAttributeBottom multiplier:1 constant:-butContRect.origin.y],
+    [NSLayoutConstraint constraintWithItem:butCont attribute:NSLayoutAttributeWidth relatedBy:NSLayoutRelationEqual toItem:nil attribute:NSLayoutAttributeWidth multiplier:1 constant:butContRect.size.width],
+    [NSLayoutConstraint constraintWithItem:butCont attribute:NSLayoutAttributeHeight relatedBy:NSLayoutRelationEqual toItem:nil attribute:NSLayoutAttributeHeight multiplier:1 constant:butContRect.size.height],
+  ]];
+
   NSTrackingAreaOptions nstopts = NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways | NSTrackingInVisibleRect | NSTrackingAssumeInside;
   NSTrackingArea *nstArea = [[NSTrackingArea alloc] initWithRect:[[self contentView] frame] options:nstopts owner:self userInfo:nil];
 
@@ -327,10 +350,7 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
 
 - (void) setSize:(CGSize)size andAspectRatio:(CGSize) ar{
   if(window_id == 0) return;
-  if(pvc){
-    [pvc setAspectRatio:ar];
-    [[[pvc view] window] setContentSize:size];
-  }
+  if(pvc) [pvc setAspectRatio:ar];
   else{
     [self setAspectRatio:ar];
     [self setContentSize:size];
