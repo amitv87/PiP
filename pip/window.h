@@ -40,6 +40,7 @@
   Button* playbutt;
   int refreshRate;
   bool shouldClose;
+  bool isWinClosing;
   bool isPipCLosing;
   CGWindowID window_id;
   RootView* rootView;

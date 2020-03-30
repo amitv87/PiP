@@ -56,15 +56,46 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
 }
 @end
 
+@interface CircularButton : NSButton
+- (instancetype)initWithRadius:(int)rad;
+@end
+
+@implementation CircularButton{
+  int radius;
+}
+- (instancetype)initWithRadius:(int)rad{
+  radius = rad;
+  int sideLen = radius * 2;
+  self = [super initWithFrame:NSMakeRect(0, 0, sideLen, sideLen)];
+  return self;
+}
+
+- (bool)isVaid:(NSEvent *)event{
+  NSPoint loc = [self convertPoint:[event locationInWindow] fromView:nil];
+  CGPoint circle = NSMakePoint(radius, radius);
+  bool isValid = isInside(radius, circle, loc);
+//  NSLog(@"isValid: %d, cirlce: %f x %f, loc: %f x %f", isValid, circle.x, circle.y, loc.x, loc.y);
+  return isValid;
+}
+
+- (void)mouseUp:(NSEvent *)event{
+  if([self isVaid:event]) [super mouseUp:event];
+}
+
+- (void)mouseDown:(NSEvent *)event{
+  if([self isVaid:event]) [super mouseDown:event];
+}
+
+@end
+
 @implementation Button{
   int radius;
-  bool wasMouseDown;
+  NSButton* button;
   NSImageView* view;
 }
 
 - (id) initWithRadius:(int)rad andImage:(NSImage*) img{
   radius = rad;
-  wasMouseDown = false;
   int sideLen = radius * 2;
   self = [super initWithFrame:NSMakeRect(0, 0, sideLen, sideLen)];
 
@@ -73,13 +104,16 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
   self.layer.backgroundColor = nil;
 
   self.state = NSVisualEffectStateActive;
-  self.material = NSVisualEffectMaterialMenu;
+  self.material = NSVisualEffectMaterialAppearanceBased;
   self.blendingMode = NSVisualEffectBlendingModeWithinWindow;
-
   self.maskImage = [NSImage swatchWithColor:[NSColor blackColor] size:NSMakeRect(0, 0, sideLen, sideLen).size];
 
-  view = [[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, sideLen, sideLen)];
-  [self addSubview:view];
+  button = [[CircularButton alloc] initWithRadius:radius];
+  [button setBordered:NO];
+  [button setAction:@selector(onClick:)];
+  [button setTarget:self];
+  [self addSubview:button];
+
   [self setImage:img];
 
   return self;
@@ -88,38 +122,12 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
 - (void)setImage:(NSImage*) img{
   int iconLen = radius * 1.25;
   [img setSize:NSMakeSize(iconLen, iconLen)];
-  [view setImage:img];
+  [button setImage:img];
+  [button setImagePosition:NSImageOnly];
 }
 
-- (void)mouseUp:(NSEvent *)event{
-  [self onMouse:false withEvent:event];
-}
-
-- (void)mouseDown:(NSEvent *)event{
-  [self onMouse:true withEvent:event];
-}
-
-- (void)mouseDragged:(NSEvent *)event{
-  [self onMouse:true withEvent:event];
-}
-
-- (void)onMouse:(bool)down withEvent:(NSEvent *)event{
-  NSPoint loc = [self convertPoint:[event locationInWindow] fromView:nil];
-  CGPoint circle = NSMakePoint(radius, radius);
-  bool isValid = isInside(radius, circle, loc);
-//  NSLog(@"onMouse %d,in: %d, cirlce: %f x %f, loc: %f x %f", down, isValid, circle.x, circle.y, loc.x, loc.y);
-  
-  if(isValid && down){
-    wasMouseDown = true;
-    self.state = NSVisualEffectStateInactive;
-    self.layer.backgroundColor = [NSColor whiteColor].CGColor;
-  }
-  else{
-    self.state = NSVisualEffectStateActive;
-    self.layer.backgroundColor = nil;
-    if(wasMouseDown && isValid) [self.delegate onClick:self];
-    wasMouseDown = false;
-  }
+-(void)onClick:(id)sender{
+  [self.delegate onClick:self];
 }
 
 @end
@@ -137,7 +145,7 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
   float factor = [event magnification];
   float width = bounds.size.width + (bounds.size.width * factor);
   float height = bounds.size.height + (bounds.size.height * factor);
-  if(windowBounds.size.width < width || windowBounds.size.height < height || width < kMinSize || height < kMinSize) return;
+  if(windowBounds.size.width < width || windowBounds.size.height < height || (width < kMinSize && height < kMinSize)) return;
 
   NSRect windowRect = [[self window] frame];
   windowRect.size.width = width;
@@ -155,6 +163,7 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
   window_id = 0;
   refreshRate = 30;
   shouldClose = false;
+  isWinClosing = false;
   isPipCLosing = false;
 
   self = [super initWithContentRect:kStartRect styleMask:kStyleMaskOnHoverIn backing:NSBackingStoreBuffered defer:YES];
@@ -173,7 +182,7 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
   [self setBackgroundColor:[NSColor clearColor]];
   [self setMinSize:NSMakeSize(kMinSize, kMinSize)];
   [self setMaxSize:[[self screen] visibleFrame].size];
-
+  [self setCollectionBehavior: NSWindowCollectionBehaviorManaged];
   [self setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameAqua]];
 
   selectionView = [[SelectionView alloc] init];
@@ -182,24 +191,22 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
 
   glView = [[OpenGLView alloc] initWithFrame:kStartRect];
   glView.delegate = self;
-//  glView.wantsLayer = true;
-//  glView.layer.masksToBounds = true;
-//  [glView setNeedsLayout:true];
   glView.autoresizingMask = NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin;
   [glView setHidden:true];
 
-  NSRect butContRect = NSMakeRect(0, 12, 100, 40);
+  int buttonRadius = 20;
+  NSRect butContRect = NSMakeRect(0, 12, (buttonRadius * 4) + 20, buttonRadius * 2);
   butCont = [[NSView alloc] initWithFrame:butContRect];
   butCont.translatesAutoresizingMaskIntoConstraints = false;
 
-  popbutt = [[Button alloc] initWithRadius:20 andImage:GET_IMG(pop)];
+  popbutt = [[Button alloc] initWithRadius:buttonRadius andImage:GET_IMG(pop)];
   [popbutt setDelegate:self];
-  [popbutt setFrameOrigin:NSMakePoint(round((NSWidth([butCont bounds]) - NSWidth([popbutt frame])) / 2) - 27, 0)];
+  [popbutt setFrameOrigin:NSMakePoint(round((NSWidth([butCont bounds]) - NSWidth([popbutt frame])) / 2) - (buttonRadius + 7), 0)];
   [butCont addSubview:popbutt];
 
-  playbutt = [[Button alloc] initWithRadius:20 andImage:GET_IMG(play)];
+  playbutt = [[Button alloc] initWithRadius:buttonRadius andImage:GET_IMG(play)];
   [playbutt setDelegate:self];
-  [playbutt setFrameOrigin:NSMakePoint(round((NSWidth([butCont bounds]) - NSWidth([playbutt frame])) / 2) + 27, 0)];
+  [playbutt setFrameOrigin:NSMakePoint(round((NSWidth([butCont bounds]) - NSWidth([playbutt frame])) / 2) + (buttonRadius + 7), 0)];
   [butCont addSubview:playbutt];
 
   rootView = [[RootView alloc] initWithFrame:kStartRect];
@@ -260,12 +267,13 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
 }
 
 - (void)togglePlayback{
+  if(isWinClosing) return;
   if(timer) [self stopTimer];
   else [self startTimer:1.0/refreshRate];
 }
 
 - (void)toggleNativePip{
-  if(isPipCLosing) return;
+  if(isWinClosing || isPipCLosing) return;
   if(pvc){
     [self pipActionReturn:pvc];
     [self pipWillClose:pvc];
@@ -284,32 +292,27 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
   pvc = [[PIPViewController alloc] init];
   [pvc setDelegate:self];
   [pvc setUserCanResize:true];
+  [pvc setReplacementWindow:nil];
   [pvc setReplacementRect:[self frame]];
   [pvc setAspectRatio:[self aspectRatio]];
   [pvc presentViewControllerAsPictureInPicture:nvc];
-
   [self resetPlaybackSate];
   [self setIsVisible:false];
   [self onMouseEnter:false];
-}
-
-- (void)onPiPResize{
-  NSRect rect = [[[pvc view] window] frame];
-  NSLog(@"onPiPResize %@", NSStringFromRect(rect));
 }
 
 - (void)stopPip:(bool) force{
   if(!pvc) return;
 //  NSLog(@"stopPip %d", force);
   [pvc setDelegate:nil];
-  [self setIsVisible:true];
-  [self setContentViewController:nil];
   if(force) [pvc dismissViewController:nvc];
   NSRect rect = pvc.replacementRect;
-  [[nvc view] setFrameSize:rect.size];
+  pvc = nil;
+  [self setContentViewController:nil];
   [self setContentViewController:nvc];
   [self setAspectRatio:rect.size];
-  pvc = nil;
+  [self setFrame:rect display:YES];
+  [self setIsVisible:true];
 }
 
 - (void)pipActionStop:(PIPViewController *)pip{
@@ -331,8 +334,10 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
 - (void)pipActionReturn:(PIPViewController *)pip{
 //  NSLog(@"pipActionReturn");
   shouldClose = false;
-//  [pip setReplacementWindow:nil];
-  [pip setReplacementRect:[self frame]];
+  NSRect rect = [self frame];
+  NSSize ar = [pip aspectRatio];
+  rect.size.height = rect.size.width * ar.height / ar.width;
+  [pip setReplacementRect:rect];
 }
 
 - (void)pipWillClose:(PIPViewController *)pip{
@@ -350,10 +355,12 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
 
 - (void) setSize:(CGSize)size andAspectRatio:(CGSize) ar{
   if(window_id == 0) return;
+  [self setAspectRatio:ar];
   if(pvc) [pvc setAspectRatio:ar];
   else{
-    [self setAspectRatio:ar];
-    [self setContentSize:size];
+    NSRect rect = self.frame;
+    rect.size = size;
+    [self setFrame:rect display:YES];
   }
 }
 
@@ -394,6 +401,7 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
     }
     if(result) CFRelease(result);
   }
+  else return;
 
   NSMenuItem* item = [[NSMenuItem alloc] init];
   [item setTarget:self];
@@ -458,16 +466,15 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
 
   for (CFIndex i = 0; i < CFArrayGetCount(all_windows); ++i) {
     CFDictionaryRef window_ref = (CFDictionaryRef)CFArrayGetValueAtIndex(all_windows, i);
+    CFNumberRef window_layer = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowLayer);
+    CFNumberGetValue(window_layer, kCFNumberIntType, &layer);
+
+    if(layer != 0) continue;
+    
     CFNumberRef id_ref = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowNumber);
     CFStringRef name_ref = (CFStringRef)CFDictionaryGetValue(window_ref, kCGWindowName);
     CFStringRef owner_ref = (CFStringRef)CFDictionaryGetValue(window_ref, kCGWindowOwnerName);
-    CFNumberRef window_layer = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowLayer);
-
     CFNumberGetValue(id_ref, kCFNumberIntType, &windowId);
-    CFNumberGetValue(window_layer, kCFNumberIntType, &layer);
-    
-//    NSLog(@"app:%@, window: %@, layer:%d", (__bridge NSString*)owner_ref, (__bridge NSString*)name_ref, layer);
-    if(layer != 0) continue;
 
     CGImageRef window_image = CGWindowListCreateImage(CGRectNull, kCGWindowListOptionIncludingWindow, windowId, kCGWindowImageNominalResolution | kCGWindowImageBoundsIgnoreFraming);
     if(window_image == NULL) continue;
@@ -499,14 +506,10 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
   }
 
   CFRelease(all_windows);
-
-//  NSPoint loc = [rootView convertPoint:[theEvent locationInWindow] fromView:nil];
-//  NSLog(@"onRightMouse loc: %f x %f", loc.x, loc.y);
   [NSMenu popUpContextMenu:theMenu withEvent:theEvent forView:rootView];
 }
 
 - (void) setScale:(NSInteger) scale{
-//  NSLog(@"setScale %ld", (long)scale);
   if(window_id > 0) [glView setScale:scale];
 }
 
@@ -516,15 +519,21 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
 }
 
 - (void)changeWindow:(id)sender{
+//  NSLog(@"changeWindow");
   WindowSel* sel = [sender representedObject];
 
+  if(!sel.winId){
+    NSSize size = [self frame].size;
+    size.height = size.width;
+    [self setSize:size andAspectRatio:kStartRect.size];
+  }
+
   window_id = sel.winId;
+  [self startTimer:1.0/refreshRate];
+
   selectionView.selection = CGRectZero;
   [glView setHidden:window_id == 0];
   [self setOnwer:sel.owner withTitle:sel.title];
-
-  if(window_id)[self startTimer:1.0/refreshRate];
-  else [self stopTimer];
 }
 
 - (void)selectRegion:(id)sender{
@@ -535,18 +544,27 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
 }
 
 - (void)close{
-//  NSLog(@"close window");
+//  NSLog(@"close pvc: %d, isPipCLosing: %d, isWinClosing: %d", (int)pvc, isPipCLosing, isWinClosing);
   if(pvc){
-    NSRect rect = [[[pvc view] window] frame];
-    rect.origin.x += rect.size.width / 2;
-    rect.origin.y += rect.size.height / 2;
-    rect.size.width = 0;
-    rect.size.height = 0;
-    [pvc setReplacementRect:rect];
+    if(!isPipCLosing){
+      NSRect rect = [[[pvc view] window] frame];
+      rect.origin.x += rect.size.width / 2;
+      rect.origin.y += rect.size.height / 2;
+      rect.size.width = 0;
+      rect.size.height = 0;
+
+      shouldClose = true;
+      isPipCLosing = true;
+      [pvc setReplacementRect:rect];
+      [pvc dismissViewController:nvc];
+    }
+    return;
   }
-  [self stopPip:true];
+
+  if(isWinClosing) return;
+  isWinClosing = true;
+
   [self stopTimer];
-  [self setContentViewController:nil];
 
   window_id = 0;
   popbutt.delegate = NULL;
@@ -557,6 +575,7 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
   [popbutt removeFromSuperview];
   [playbutt removeFromSuperview];
   [selectionView removeFromSuperview];
+  [rootView removeFromSuperview];
 
   nvc = NULL;
   timer = NULL;
@@ -566,6 +585,8 @@ bool isInside(int rad, CGPoint cirlce, CGPoint point){
   popbutt = NULL;
   playbutt = NULL;
   selectionView = NULL;
+
+  [self setContentViewController:nil];
 
   [super close];
 }

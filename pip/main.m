@@ -97,8 +97,7 @@
 
 - (void) newWindow{
     [[[Window alloc] init] setIgnoresMouseEvents:clickThroughState];
-    [windowMenuItem setEnabled:YES];
-//    NSLog(@"newWindow wc: %lu", [[app windows] count]);
+  [windowMenuItem setEnabled:true];
 }
 
 - (void) toggleNativePip{
@@ -133,11 +132,9 @@
 }
 
 -(BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender{
-  if([[app windows] count] > 0){
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 333 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-      [windowMenuItem setEnabled:[[app windows] count] > 1];
-    });
-  }
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+    [windowMenuItem setEnabled:[[app windows] count] > 1];
+  });
   return false;
 }
 
