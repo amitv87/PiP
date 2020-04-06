@@ -16,6 +16,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		551EB2A5243B49AB002C6D34 /* cgs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = cgs.h; sourceTree = "<group>"; };
 		552115841FDD120F00F90350 /* PiP.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PiP.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		554AA7DC1FDDADEE00233377 /* info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = info.plist; sourceTree = "<group>"; };
 		554AA7FB1FDDB16200233377 /* Media.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Media.xcassets; sourceTree = "<group>"; };
@@ -69,6 +70,7 @@
 				55B827BE1FD3228500DD51A3 /* openGLView.h */,
 				55B827BF1FD322A800DD51A3 /* openGLView.m */,
 				55FEB9212115ECCC00D8350C /* pip.h */,
+				551EB2A5243B49AB002C6D34 /* cgs.h */,
 				55DDE8C71FD6BAA400B19D89 /* selectionView.h */,
 				55DDE8C81FD6BACF00B19D89 /* selectionView.m */,
 				55DDE8CA1FD6BB3E00B19D89 /* window.h */,

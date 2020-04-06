@@ -11,7 +11,6 @@
 
 #import "pip.h"
 #import "openGLView.h"
-#import "selectionView.h"
 
 @class Button;
 
@@ -29,30 +28,15 @@
 
 @interface Button : NSVisualEffectView
 @property (nonatomic) id<ButtonDelegate> delegate;
-- (id) initWithRadius:(int)radius andImage:(NSImage*) img;
+@property (nonatomic) float imageScale;
+- (id) initWithRadius:(int)radius andImage:(NSImage*) img andImageScale:(float)scale;
 - (void) setImage:(NSImage*) img;
 @end
 
-@interface Window : NSWindow<NSWindowDelegate, RootViewDelegate, GLDelegate, ButtonDelegate, PIPViewControllerDelegate>{
-  NSTimer* timer;
-  NSView* butCont;
-  Button* popbutt;
-  Button* playbutt;
-  int refreshRate;
-  bool shouldClose;
-  bool isWinClosing;
-  bool isPipCLosing;
-  CGWindowID window_id;
-  RootView* rootView;
-  OpenGLView* glView;
-  NSViewController* nvc;
-  PIPViewController* pvc;
-  SelectionView* selectionView;
-}
-
+@interface Window : NSPanel<NSWindowDelegate, RootViewDelegate, GLDelegate, ButtonDelegate, PIPViewControllerDelegate>
+- (void)togglePin;
 - (void)togglePlayback;
 - (void)toggleNativePip;
 - (void)setScale:(NSInteger) scale;
-
 @end
 #endif /* Window_h */
