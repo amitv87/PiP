@@ -10,11 +10,8 @@
 #import "img.h"
 #import "common.h"
 #import "window.h"
-#import "selectionView.h"
 
 #define GET_IMG(x) [[NSImage alloc] initWithData:[NSData dataWithBytes:img_##x##_png length:img_##x##_png_len]]
-
-int windowCount = 0;
 
 static CGRect kStartRect = {
   .origin = {
@@ -27,6 +24,8 @@ static CGRect kStartRect = {
   },
 };
 
+static const bool shouldEnableFullScreen = false;
+
 static NSWindowStyleMask kWindowMask = NSWindowStyleMaskBorderless | NSWindowStyleMaskResizable
   | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
   | NSWindowStyleMaskTexturedBackground | NSWindowStyleMaskUnifiedTitleAndToolbar | NSWindowStyleMaskFullSizeContentView
@@ -36,6 +35,32 @@ static NSWindowStyleMask kWindowMask = NSWindowStyleMaskBorderless | NSWindowSty
 bool isInside(int rad, CGPoint cirlce, CGPoint point){
   if ((point.x - cirlce.x) * (point.x - cirlce.x) + (point.y - cirlce.y) * (point.y - cirlce.y) <= rad * rad) return true;
   else return false;
+}
+
+void setWindowSize(NSWindow* window, NSRect windowRect, NSRect screenRect, NSSize size, bool animate){
+  float screenWidth = screenRect.origin.x + screenRect.size.width;
+  float screenHeight = screenRect.origin.y + screenRect.size.height;
+
+  if(windowRect.origin.x + windowRect.size.width == screenWidth)
+    windowRect.origin.x += windowRect.size.width - size.width;
+  else{
+    float clippingWidth = screenWidth - (windowRect.origin.x + size.width);
+    if(clippingWidth < 0) windowRect.origin.x += clippingWidth;
+  }
+
+  if(windowRect.origin.y + windowRect.size.height == screenHeight)
+    windowRect.origin.y += windowRect.size.height - size.height;
+  else{
+    float clippingHeight = screenHeight - (windowRect.origin.y + size.height);
+    if(clippingHeight < 0) windowRect.origin.y += clippingHeight;
+  }
+
+  if(windowRect.origin.x < screenRect.origin.x) windowRect.origin.x = screenRect.origin.x;
+  if(windowRect.origin.y < screenRect.origin.y) windowRect.origin.y = screenRect.origin.y;
+
+  windowRect.size = size;
+
+  [window setFrame:windowRect display:YES animate:animate];
 }
 
 @interface WindowSel : NSObject{}
@@ -90,7 +115,6 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   NSPoint loc = [self convertPoint:[event locationInWindow] fromView:nil];
   CGPoint circle = NSMakePoint(radius, radius);
   bool isValid = isInside(radius, circle, loc);
-  //  NSLog(@"isValid: %d, cirlce: %f x %f, loc: %f x %f", isValid, circle.x, circle.y, loc.x, loc.y);
   return isValid;
 }
 
@@ -100,6 +124,12 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
 - (void)mouseDown:(NSEvent *)event{
   if([self isVaid:event]) [super mouseDown:event];
+}
+
+- (void)drawRect:(NSRect)dirtyRect{
+  NSColor* target = self.isHighlighted ? [NSColor whiteColor] : [NSColor clearColor];
+  self.layer.backgroundColor = target.CGColor;
+  [super drawRect:dirtyRect];
 }
 
 @end
@@ -120,12 +150,12 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   self.layer.backgroundColor = nil;
 
   self.state = NSVisualEffectStateActive;
-  self.material = NSVisualEffectMaterialAppearanceBased;
+  self.material = NSVisualEffectMaterialLight;
   self.blendingMode = NSVisualEffectBlendingModeWithinWindow;
   self.maskImage = [NSImage swatchWithColor:[NSColor blackColor] size:NSMakeRect(0, 0, sideLen, sideLen).size];
 
   button = [[CircularButton alloc] initWithRadius:radius];
-  [button setFocusRingType:NSFocusRingTypeNone];
+  [button setButtonType:NSMomentaryChangeButton];
   [button setBordered:NO];
   [button setAction:@selector(onClick:)];
   [button setTarget:self];
@@ -147,6 +177,20 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   [self.delegate onClick:self];
 }
 
+- (void) setEnable:(bool) en{
+  button.enabled = en;
+}
+
+- (bool) getEnabled{
+  return button.isEnabled;
+}
+
+@end
+
+@implementation NSWindow (FullScreen)
+- (BOOL)isFullScreen{
+  return (([self styleMask] & NSWindowStyleMaskFullScreen) == NSWindowStyleMaskFullScreen);
+}
 @end
 
 @implementation RootView
@@ -156,18 +200,25 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 }
 
 - (void)magnifyWithEvent:(NSEvent *)event{
-  NSRect bounds = [self bounds];
-  NSRect windowBounds = [[self.window screen] visibleFrame];
+  if([self.window isFullScreen]) return;
+  NSSize ar = self.window.aspectRatio;
+  NSRect windowRect = [self.window frame];
+  NSRect screenRect = [[self.window screen] visibleFrame];
 
-  float factor = [event magnification];
-  float width = bounds.size.width + (bounds.size.width * factor);
-  float height = bounds.size.height + (bounds.size.height * factor);
-  if(windowBounds.size.width < width || windowBounds.size.height < height || (width < kMinSize && height < kMinSize)) return;
+  float width, height, scale = [event magnification] + 1;
 
-  NSRect windowRect = [[self window] frame];
-  windowRect.size.width = width;
-  windowRect.size.height = height;
-  [self.window setFrame:windowRect display:YES];
+  if(ar.width * ar.height == 0){
+    width = windowRect.size.width * scale;
+    height = windowRect.size.height * scale;
+  }
+  else{
+    width = windowRect.size.width * scale;
+    height = (width * ar.height / ar.width);
+  }
+
+  if(screenRect.size.width < width || screenRect.size.height < height || (width < kMinSize && height < kMinSize)) return;
+
+  setWindowSize(self.window, windowRect, screenRect, NSMakeSize(width, height), false);
 }
 
 @end
@@ -178,17 +229,19 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   Button* pinbutt;
   Button* popbutt;
   Button* playbutt;
+  float contentAR;
   int refreshRate;
   bool shouldClose;
   bool isWinClosing;
   bool isPipCLosing;
   CGWindowID window_id;
   RootView* rootView;
-  OpenGLView* glView;
   NSViewController* nvc;
   PIPViewController* pvc;
   SelectionView* selectionView;
   NSTitlebarAccessoryViewController* tbavc;
+
+  ImageView* imageView;
 }
 
 - (id) init{
@@ -202,59 +255,66 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
   self = [super initWithContentRect:kStartRect styleMask:kWindowMask backing:NSBackingStoreBuffered defer:YES];
 
-  [self setOpaque:NO];
-  [self setMovable:YES];
-  [self setDelegate:self];
-  [self setReleasedWhenClosed:NO];
+  NSRect screenRect = [[self screen] visibleFrame];
+  NSPoint point = NSMakePoint(
+    screenRect.origin.x + screenRect.size.width - kStartRect.size.width,
+    screenRect.origin.y
+//    + screenRect.size.height - kStartRect.size.height
+  );
+  [self setFrameOrigin:point];
+
+  self.opaque = YES;
+  self.movable = YES;
+  self.delegate = self;
+  self.releasedWhenClosed = NO;
+  self.level = NSFloatingWindowLevel;
+  self.movableByWindowBackground = YES;
+  self.titlebarAppearsTransparent = true;
+  self.aspectRatio = kStartRect.size;
+  self.minSize = NSMakeSize(kMinSize, kMinSize);
+  self.maxSize = [[self screen] visibleFrame].size;
+  self.preservesContentDuringLiveResize = false;
+  self.collectionBehavior = NSWindowCollectionBehaviorManaged | NSWindowCollectionBehaviorParticipatesInCycle |
+  (shouldEnableFullScreen ? NSWindowCollectionBehaviorFullScreenPrimary : NSWindowCollectionBehaviorFullScreenAuxiliary);
+
   [self makeKeyAndOrderFront:self];
-  [self setShowsResizeIndicator:NO];
-  [self setContentSize:kStartRect.size];
-  [self setAspectRatio:kStartRect.size];
-  [self setLevel: NSFloatingWindowLevel];
-  [self setMovableByWindowBackground:YES];
-  [self setTitlebarAppearsTransparent:true];
-  [self setBackgroundColor:[NSColor clearColor]];
-  [self setMinSize:NSMakeSize(kMinSize, kMinSize)];
-  [self setMaxSize:[[self screen] visibleFrame].size];
-  [self setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameAqua]];
-  [self setCollectionBehavior: NSWindowCollectionBehaviorManaged | NSWindowCollectionBehaviorParticipatesInCycle | NSWindowCollectionBehaviorFullScreenAuxiliary];
 
   selectionView = [[SelectionView alloc] init];
-  selectionView.selection = CGRectZero;
+  selectionView.delegate = self;
   selectionView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
-  glView = [[OpenGLView alloc] initWithFrame:kStartRect];
-  glView.delegate = self;
-  glView.autoresizingMask = NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin;
-  [glView setHidden:true];
-
-  float butScale = 1.25;
+  float butScale = 2;
   int buttonRadius = 20;
   NSRect butContRect = NSMakeRect(0, 12, (buttonRadius * 4) + 20, buttonRadius * 2);
   butCont = [[NSView alloc] initWithFrame:butContRect];
   butCont.translatesAutoresizingMaskIntoConstraints = false;
 
+  #define NSColorFromRGB(rgbValue, opacity) [NSColor colorWithRed:((float)((rgbValue & 0xFF0000) >> 16))/255.0 \
+    green:((float)((rgbValue & 0xFF00) >> 8))/255.0 blue:((float)(rgbValue & 0xFF))/255.0 alpha:opacity]
+
   popbutt = [[Button alloc] initWithRadius:buttonRadius andImage:GET_IMG(pop) andImageScale:butScale];
   [popbutt setDelegate:self];
-  [popbutt setFrameOrigin:NSMakePoint(round((NSWidth([butCont bounds]) - NSWidth([popbutt frame])) / 2) - (buttonRadius + 7), 0)];
+  [popbutt setFrameOrigin:NSMakePoint(round((NSWidth([butCont bounds]) - NSWidth([popbutt frame])) / 2) - (buttonRadius + 7.5), 0)];
   [butCont addSubview:popbutt];
 
   playbutt = [[Button alloc] initWithRadius:buttonRadius andImage:GET_IMG(play) andImageScale:butScale];
   [playbutt setDelegate:self];
-  [playbutt setFrameOrigin:NSMakePoint(round((NSWidth([butCont bounds]) - NSWidth([playbutt frame])) / 2) + (buttonRadius + 7), 0)];
+  [playbutt setFrameOrigin:NSMakePoint(round((NSWidth([butCont bounds]) - NSWidth([playbutt frame])) / 2) + (buttonRadius + 7.5), 0)];
   [butCont addSubview:playbutt];
 
-  int ppbutradius = 8;
-  pinbutt = [[Button alloc] initWithRadius:ppbutradius andImage:nil andImageScale:1.5];
+  int ppbutradius = 6.5;
+  float butspacing = ppbutradius * 3;
+  pinbutt = [[Button alloc] initWithRadius:ppbutradius andImage:nil andImageScale:1.8];
+  [pinbutt setFrameOrigin:NSMakePoint(0 * butspacing, 5)];
   [pinbutt setDelegate:self];
   [self setupPushPin:false];
 
-  NSView* view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, ppbutradius * 3, 0)];
+  NSView* view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 1 * butspacing, 0)];
   [view addSubview:pinbutt];
 
   tbavc = [[NSTitlebarAccessoryViewController alloc] init];
   tbavc.view = view;
-  tbavc.layoutAttribute = NSLayoutAttributeRight;
+  tbavc.layoutAttribute = NSLayoutAttributeTrailing;
   [self addTitlebarAccessoryViewController:tbavc];
 
   rootView = [[RootView alloc] initWithFrame:kStartRect];
@@ -264,7 +324,12 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   [rootView setState:NSVisualEffectStateActive];
   rootView.autoresizingMask = NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin;
 
-  [rootView addSubview:glView];
+  imageView = [[ImageView alloc] initWithFrame:kStartRect];
+  imageView.renderer = [[MetalRenderer alloc] init];
+  imageView.renderer.delegate = self;
+  imageView.hidden = true;
+  [rootView addSubview:imageView];
+
   [rootView addSubview:butCont];
 
   NSLayoutConstraint* constCentX = [NSLayoutConstraint constraintWithItem:butCont attribute:NSLayoutAttributeCenterX relatedBy:NSLayoutRelationEqual toItem:rootView attribute:NSLayoutAttributeCenterX multiplier:1 constant:-butContRect.origin.x];
@@ -286,8 +351,6 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 //  [self onMouseEnter:false];
   [self setOnwer:@"PiP" withTitle:@"(right click to begin)"];
 
-  windowCount += 1;
-
   return self;
 }
 
@@ -301,10 +364,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 }
 
 - (void) onClick:(Button*)button{
-  if(button == playbutt){
-    if(timer) [self stopTimer];
-    else [self startTimer:1.0/refreshRate];
-  }
+  if(button == playbutt) [self togglePlayback];
   else if(button == popbutt) [self toggleNativePip];
   else if(button == pinbutt) [self togglePin];
 }
@@ -318,20 +378,66 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 }
 
 - (void)onMouseEnter:(BOOL)value{
-  bool alphaVal = !self.ignoresMouseEvents && value && !pvc;
+  bool alphaVal = value;
+  if([self isFullScreen]) alphaVal = true;
+  if(pvc) alphaVal = false;
+  if(self.ignoresMouseEvents) alphaVal = false;
   [[butCont animator] setAlphaValue:alphaVal];
   [[[[self standardWindowButton:NSWindowCloseButton] superview] animator] setAlphaValue:alphaVal];
 }
 
 - (void)setupPushPin:(bool)active{
-  [pinbutt setImage:active ? GET_IMG(pin) : GET_IMG(pinned)];
+  [pinbutt setImage:active ? GET_IMG(pinned) : GET_IMG(pin)];
 }
 
 - (void)togglePin{
+  if(![pinbutt getEnabled]) return;
   bool isPinned = (self.collectionBehavior & NSWindowCollectionBehaviorCanJoinAllSpaces) == NSWindowCollectionBehaviorCanJoinAllSpaces;
-  if(isPinned) self.collectionBehavior &= ~NSWindowCollectionBehaviorCanJoinAllSpaces;
-  else self.collectionBehavior |= NSWindowCollectionBehaviorCanJoinAllSpaces;
+  if(isPinned){
+    self.collectionBehavior &= ~NSWindowCollectionBehaviorCanJoinAllSpaces;
+    if(shouldEnableFullScreen){
+      self.collectionBehavior &= ~NSWindowCollectionBehaviorFullScreenAuxiliary;
+      self.collectionBehavior |= NSWindowCollectionBehaviorFullScreenPrimary;
+    }
+  }
+  else{
+    if(shouldEnableFullScreen){
+      self.collectionBehavior &= ~NSWindowCollectionBehaviorFullScreenPrimary;
+      self.collectionBehavior |= NSWindowCollectionBehaviorFullScreenAuxiliary;
+    }
+    self.collectionBehavior |= NSWindowCollectionBehaviorCanJoinAllSpaces;
+  }
   [self setupPushPin:!isPinned];
+}
+
+- (void)resetWindow:(bool) fromPiPEvent{
+  if(!fromPiPEvent && pvc) return;
+  if([self isFullScreen]){
+    [pinbutt setEnable:false];
+    contentAR = self.aspectRatio.width * self.aspectRatio.height != 0 ? self.aspectRatio.width / self.aspectRatio.height : 0;
+    NSRect screenRect = [[self screen] frame];
+    if(contentAR >= 0.1){
+      NSSize size = screenRect.size;
+      size = NSMakeSize(fmin(size.height * contentAR, size.width), fmin(size.width / contentAR, size.height));
+      if(screenRect.size.width > size.width) screenRect.origin.x = (screenRect.size.width - size.width) / 2;
+      if(screenRect.size.height > size.height) screenRect.origin.y = (screenRect.size.height - size.height) / 2;
+      screenRect.size = size;
+    }
+    [self setMaxSize:screenRect.size];
+    [self setFrame:screenRect display:YES];
+  }
+  else{
+    [pinbutt setEnable:true];
+    [self setMaxSize:[[self screen] visibleFrame].size];
+  }
+}
+
+- (void)windowDidChangeScreen:(NSNotification *)notification{
+  [self resetWindow:false];
+}
+
+- (void)windowDidChangeScreenProfile:(NSNotification *)notification{
+  [self resetWindow:false];
 }
 
 - (void)togglePlayback{
@@ -402,9 +508,10 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 - (void)pipActionReturn:(PIPViewController *)pip{
 //  NSLog(@"pipActionReturn");
   shouldClose = false;
+  [self resetWindow:true];
   NSRect rect = [self frame];
   NSSize ar = [pip aspectRatio];
-  rect.size.height = rect.size.width * ar.height / ar.width;
+  if(ar.width * ar.height != 0) rect.size.height = rect.size.width * ar.height / ar.width;
   [pip setReplacementRect:rect];
 }
 
@@ -418,18 +525,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 //  NSLog(@"pipDidClose");
   [self stopPip:!isPipCLosing];
   isPipCLosing = false;
-  if(shouldClose)[self close];
-}
-
-- (void) setSize:(CGSize)size andAspectRatio:(CGSize) ar{
-  if(window_id == 0) return;
-  [self setAspectRatio:ar];
-  if(pvc) [pvc setAspectRatio:ar];
-  else{
-    NSRect rect = self.frame;
-    rect.size = size;
-    [self setFrame:rect display:YES];
-  }
+  if(shouldClose)[self performClose:self];
 }
 
 - (void)stopTimer{
@@ -447,10 +543,30 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   [self resetPlaybackSate];
 }
 
+- (void)onResize:(CGSize)size andAspectRatio:(CGSize) ar{
+  if(window_id == 0) return;
+  [self setAspectRatio:ar];
+  if(pvc) [pvc setAspectRatio:ar];
+  else{
+    [self resetWindow:false];
+    if([self isFullScreen]) return;
+    setWindowSize(self, self.frame, self.screen.visibleFrame, size, false);
+  }
+}
+
+- (void) onSelcetion:(NSRect) rect{
+  [imageView.renderer setCropRect:rect];
+}
+
 - (void)captrue{
   CGImageRef window_image = CaptureWindow(window_id);
   if(window_image != NULL){
-    bool rc = [glView drawImage:window_image withRect:selectionView.selection];
+    CIImage* ciimage = [CIImage imageWithCGImage:window_image];
+    CGRect imageRect = [ciimage extent];
+    bool rc = imageRect.size.height * imageRect.size.width > 1;
+
+//    imageView.renderer.cropRect = selectionView.selection;
+    if(rc) [imageView setImage:ciimage];
     CGImageRelease(window_image);
     if(rc){
       if(timer && [timer timeInterval] != 1.0/refreshRate) [self startTimer:1.0/refreshRate];
@@ -488,7 +604,8 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   [item setTarget:self];
 
   if(!pvc){
-    if(selectionView.selection.size.width == 0 && window_id != 0){
+    NSSize cropSize = [imageView.renderer cropRect].size;
+    if(cropSize.width * cropSize.height == 0 && window_id != 0){
       NSMenuItem* item = [theMenu addItemWithTitle:@"select region" action:@selector(selectRegion:) keyEquivalent:@""];
       [item setTarget:self];
     }
@@ -582,8 +699,8 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   [NSMenu popUpContextMenu:theMenu withEvent:theEvent forView:rootView];
 }
 
-- (void) setScale:(NSInteger) scale{
-  if(window_id > 0) [glView setScale:scale];
+- (void)setScale:(id)sender{
+  if(window_id > 0) [imageView.renderer setScale:[sender tag]];
 }
 
 - (void)adjustOpacity:(id)sender{
@@ -598,27 +715,28 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   if(!sel.winId){
     NSSize size = [self frame].size;
     size.height = size.width;
-    [self setSize:size andAspectRatio:kStartRect.size];
+    [self onResize:size andAspectRatio:kStartRect.size];
   }
 
   window_id = sel.winId;
   [self startTimer:1.0/refreshRate];
 
-  selectionView.selection = CGRectZero;
-  [glView setHidden:window_id == 0];
+  [imageView setImage:nil];
+  [imageView setHidden:window_id == 0];
   [self setOnwer:sel.owner withTitle:sel.title];
 }
 
 - (void)selectRegion:(id)sender{
   [self setMovable:NO];
-  [selectionView setFrameSize:NSMakeSize(glView.bounds.size.width, glView.bounds.size.height)];
-  [glView addSubview:selectionView];
+  [selectionView setFrameSize:NSMakeSize(imageView.bounds.size.width, imageView.bounds.size.height)];
+  [imageView addSubview:selectionView];
   [[NSCursor crosshairCursor] set];
 }
 
+- (void)cancel:(id)arg1{}
+
 - (void)windowWillClose:(NSNotification *)notification{
 //  NSLog(@"windowWillClose");
-  windowCount -= 1;
 }
 
 - (void)windowDidBecomeKey:(NSNotification *)notification{
@@ -657,7 +775,10 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   popbutt.delegate = NULL;
   playbutt.delegate = NULL;
 
-  [glView removeFromSuperview];
+  imageView.renderer.delegate = nil;
+  imageView.renderer = nil;
+
+  [imageView removeFromSuperview];
   [pinbutt removeFromSuperview];
   [butCont removeFromSuperview];
   [popbutt removeFromSuperview];
@@ -670,7 +791,6 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   tbavc = NULL;
   timer = NULL;
   rootView = NULL;
-  glView = NULL;
   butCont = NULL;
   pinbutt = NULL;
   popbutt = NULL;

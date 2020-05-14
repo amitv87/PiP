@@ -14,7 +14,6 @@
 typedef int CGSConnectionID;
 
 typedef enum {
-  kCGSWindowCaptureBestResolution    = (1 << 8),
   kCGSWindowCaptureNominalResolution = (1 << 9),
   kCGSCaptureIgnoreGlobalClipShape   = (1 << 11),
 } CGSWindowCaptureOptions;

@@ -57,12 +57,13 @@
   float width = fabs(-self.startPoint.x + self.endPoint.x);
   float height = fabs(-self.startPoint.y + self.endPoint.y);
 
-  self.selection = NSMakeRect(x, y, width, height);
   [self.shapeLayer removeFromSuperlayer];
   self.shapeLayer = nil;
   [self.window setMovable:YES];
   [self removeFromSuperview];
   [[NSCursor arrowCursor] set];
+
+  [self.delegate onSelcetion:NSMakeRect(x, y, width, height)];
 }
 
 @end

@@ -10,6 +10,23 @@
 
 extern int windowCount;
 
+#define ADD_SEP() [menu addItem:[NSMenuItem separatorItem]]
+#define INIT_MENU(title) {menu = [[NSMenu alloc] initWithTitle:title]; NSMenuItem* item = [[NSMenuItem alloc] init];[item setSubmenu:menu];[menubar addItem:item];}
+#define ADD_ITEM(title, sel, key) [menu addItem:[[NSMenuItem alloc] initWithTitle:title action:@selector(sel) keyEquivalent:key]]
+
+#define ADD_ITEM_MASK(title, sel, key, mask){ \
+NSMenuItem* item = [[NSMenuItem alloc] initWithTitle:title action:@selector(sel) keyEquivalent:key]; \
+item.keyEquivalentModifierMask = mask; \
+[menu addItem:item]; \
+}
+
+#define XSTRINGIFY(s) #s
+#define STRINGIFY(s) XSTRINGIFY(s)
+
+#define ADD_SCALE_ITEM(scale) [self addScaleMenuItemWithTitle:@"Scale " STRINGIFY(scale) keyEquivalent:@ STRINGIFY(scale) mask:NO andScale:100 * scale toMenu:menu];
+#define ADD_SCALE_ITEM_INVERSE(scale) [self addScaleMenuItemWithTitle:@"Scale 1/" STRINGIFY(scale) keyEquivalent:@ STRINGIFY(scale) mask:YES andScale:100 / scale toMenu:menu];
+
+
 @interface MyApplicationDelegate : NSObject <NSApplicationDelegate> {
   NSApplication* app;
   NSMenuItem* windowMenuItem;
@@ -23,40 +40,35 @@ extern int windowCount;
   app = application;
   clickThroughState = false;
 
+  NSMenu* menu;
+  NSMenu* menubar = [[NSMenu alloc] init];
   NSString* appName = [[NSProcessInfo processInfo] processName];
 
-  NSMenu* menubar = [[NSMenu alloc] init];
-  NSMenu* appMenu = [[NSMenu alloc] initWithTitle:appName];
-  NSMenu* windowMenu = [[NSMenu alloc] initWithTitle:@"Window"];
+  INIT_MENU(appName);
+  ADD_ITEM([@"About " stringByAppendingString:appName], orderFrontStandardAboutPanel:, @"");
+  ADD_SEP();
+  ADD_ITEM([@"Hide " stringByAppendingString:appName], hideAll, @"h");
+  ADD_ITEM([@"Quit " stringByAppendingString:appName], terminate:, @"q");
 
-  [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"About PiP" action:@selector(orderFrontStandardAboutPanel:) keyEquivalent:@""]];
+  INIT_MENU(@"File");
+  ADD_ITEM(@"New", newWindow, @"n");
+  ADD_ITEM(@"Close", performClose:, @"w");
 
-  [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"New" action:@selector(newWindow) keyEquivalent:@"n"]];
-  [appMenu addItem:[[NSMenuItem alloc] initWithTitle:@"Click Through" action:@selector(clickThrough:) keyEquivalent:@"c"]];
-  [appMenu addItem:[NSMenuItem separatorItem]];
-  [appMenu addItem:[[NSMenuItem alloc] initWithTitle:[@"Hide " stringByAppendingString:appName] action:@selector(hideAll) keyEquivalent:@"h"]];
-  [appMenu addItem:[[NSMenuItem alloc] initWithTitle:[@"Quit " stringByAppendingString:appName] action:@selector(terminate:) keyEquivalent:@"q"]];
-
-  [self addScaleMenuItemWithTitle:@"Scale 1x" keyEquivalent:@"1" mask:NO andScale:100 toMenu:windowMenu];
-  [self addScaleMenuItemWithTitle:@"Scale 2x" keyEquivalent:@"2" mask:NO andScale:200 toMenu:windowMenu];
-  [self addScaleMenuItemWithTitle:@"Scale 3x" keyEquivalent:@"3" mask:NO andScale:300 toMenu:windowMenu];
-  [windowMenu addItem:[NSMenuItem separatorItem]];
-  [self addScaleMenuItemWithTitle:@"Scale 1/2x" keyEquivalent:@"2" mask:YES andScale:100/2 toMenu:windowMenu];
-  [self addScaleMenuItemWithTitle:@"Scale 1/3x" keyEquivalent:@"3" mask:YES andScale:100/3 toMenu:windowMenu];
-  [self addScaleMenuItemWithTitle:@"Scale 1/4x" keyEquivalent:@"4" mask:YES andScale:100/4 toMenu:windowMenu];
-  [windowMenu addItem:[NSMenuItem separatorItem]];
-  [windowMenu addItem:[[NSMenuItem alloc] initWithTitle:@"Close Current" action:@selector(closeWindow) keyEquivalent:@"w"]];
-  [windowMenu addItem:[[NSMenuItem alloc] initWithTitle:@"Toggle pin" action:@selector(togglePin) keyEquivalent:@"t"]];
-  [windowMenu addItem:[[NSMenuItem alloc] initWithTitle:@"Toggle Native PiP" action:@selector(toggleNativePip) keyEquivalent:@"p"]];
-
-  windowMenuItem = [[NSMenuItem alloc] init];
-  NSMenuItem* appMenuItem = [[NSMenuItem alloc] init];
-
-  [appMenuItem setSubmenu:appMenu];
-  [windowMenuItem setSubmenu:windowMenu];
-
-  [menubar addItem:appMenuItem];
-  [menubar addItem:windowMenuItem];
+  INIT_MENU(@"Window");
+  ADD_SCALE_ITEM(1);
+  ADD_SCALE_ITEM(2);
+  ADD_SCALE_ITEM(3);
+  ADD_SEP();
+  ADD_SCALE_ITEM_INVERSE(2);
+  ADD_SCALE_ITEM_INVERSE(3);
+  ADD_SCALE_ITEM_INVERSE(4);
+  ADD_SEP();
+  ADD_ITEM_MASK(@"Zoom", performZoom:, @"z", NSEventModifierFlagCommand | NSEventModifierFlagOption);
+  ADD_ITEM(@"Minimize", performMiniaturize:, @"m");
+  ADD_ITEM(@"Join all spaces", togglePin, @"j");
+  ADD_ITEM(@"Bring All to Front", arrangeInFront:, @"");
+  ADD_ITEM(@"Toggle pin", togglePin, @"t");
+  ADD_ITEM(@"Toggle Native PiP", toggleNativePip, @"p");
 
   [app setMainMenu:menubar];
 
@@ -67,7 +79,6 @@ extern int windowCount;
 -(void) addScaleMenuItemWithTitle:(NSString*) title keyEquivalent:(NSString*) key mask:(BOOL) flag andScale:(NSInteger) scale toMenu:(NSMenu*) windowMenu{
   NSMenuItem* scaleItem = [windowMenu addItemWithTitle:title action:@selector(setScale:) keyEquivalent:key];
   [scaleItem setTag:scale];
-  [scaleItem setTarget:self];
   if(flag) [scaleItem setKeyEquivalentModifierMask:NSEventModifierFlagCommand | NSEventModifierFlagOption];
 }
 
@@ -89,42 +100,12 @@ extern int windowCount;
   if(currentWindow) cb((Window*)currentWindow);
 }
 
-- (void)resetWindowMenu{
-  [windowMenuItem setEnabled:windowCount > 0];
-}
-
-- (void) closeWindow{
-  [self getActiveWindow: ^(Window* window){
-    [window close];
-    [app removeWindowsItem:window];
-  }];
-  [self resetWindowMenu];
-}
-
 - (void) newWindow{
   [[[Window alloc] init] setIgnoresMouseEvents:clickThroughState];
-  [self resetWindowMenu];
-}
-
-- (void) togglePin{
-  [self getActiveWindow: ^(Window* window){
-    [window togglePin];
-  }];
-}
-
-- (void) toggleNativePip{
-  [self getActiveWindow: ^(Window* window){
-    [window toggleNativePip];
-  }];
 }
 
 - (void) hideAll{
   [app hide:self];
-}
-
-- (void) setScale:(id)sender{
-  NSWindow* currentWindow = (NSWindow*)[app keyWindow];
-  if(currentWindow && [currentWindow isKindOfClass:[Window class]]) [(Window*)currentWindow setScale:[sender tag]];
 }
 
 -(void) clickThrough:(id)sender{
@@ -139,12 +120,12 @@ extern int windowCount;
 -(void)applicationDidFinishLaunching:(NSNotification *)notification{
   [app setActivationPolicy:NSApplicationActivationPolicyRegular];
   [app activateIgnoringOtherApps:YES];
-  initGL();
+//  initGL();
   [self newWindow];
 }
 
 -(BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender{
-  [self resetWindowMenu];
+  NSLog(@"wc: %lu", (unsigned long)[app windows].count);
   return false;
 }
 

@@ -10,7 +10,8 @@
 #define Window_h
 
 #import "pip.h"
-#import "openGLView.h"
+#import "imageView.h"
+#import "selectionView.h"
 
 @class Button;
 
@@ -22,6 +23,13 @@
 - (void)rightMouseDown:(NSEvent *)theEvent;
 @end
 
+@protocol WindowDelegate <NSObject>
+- (void)togglePin;
+- (void)togglePlayback;
+- (void)toggleNativePip;
+- (void)setScale:(id)sender;
+@end
+
 @interface RootView : NSVisualEffectView
 @property (nonatomic) id<RootViewDelegate> delegate;
 @end
@@ -31,12 +39,10 @@
 @property (nonatomic) float imageScale;
 - (id) initWithRadius:(int)radius andImage:(NSImage*) img andImageScale:(float)scale;
 - (void) setImage:(NSImage*) img;
+- (bool) getEnabled;
+- (void) setEnable:(bool) en;
 @end
 
-@interface Window : NSPanel<NSWindowDelegate, RootViewDelegate, GLDelegate, ButtonDelegate, PIPViewControllerDelegate>
-- (void)togglePin;
-- (void)togglePlayback;
-- (void)toggleNativePip;
-- (void)setScale:(NSInteger) scale;
+@interface Window : NSPanel<NSWindowDelegate, SelectionViewDelegate, ImageRendererDelegate, WindowDelegate, RootViewDelegate, ButtonDelegate, PIPViewControllerDelegate>
 @end
 #endif /* Window_h */
