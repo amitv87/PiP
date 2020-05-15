@@ -14,14 +14,8 @@
 #define GET_IMG(x) [[NSImage alloc] initWithData:[NSData dataWithBytes:img_##x##_png length:img_##x##_png_len]]
 
 static CGRect kStartRect = {
-  .origin = {
-    .x = 0,
-    .y = 0,
-  },
-  .size = {
-    .width = kStartSize,
-    .height = kStartSize,
-  },
+  .origin = {.x = 0, .y = 0,},
+  .size = {.width = kStartSize, .height = kStartSize,},
 };
 
 static const bool shouldEnableFullScreen = false;
@@ -315,8 +309,8 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   rootView.autoresizingMask = NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin;
 
   imageView = [[ImageView alloc] initWithFrame:kStartRect];
-  imageView.renderer = [[MetalRenderer alloc] init];
-//  imageView.renderer = [[OpenGLRenderer alloc] init];
+//  imageView.renderer = [[MetalRenderer alloc] init];
+  imageView.renderer = [[OpenGLRenderer alloc] init];
   imageView.renderer.delegate = self;
   imageView.hidden = true;
 

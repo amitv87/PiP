@@ -24,6 +24,9 @@
 - (void)drawRect:(NSRect)rect {
   [self.renderDelegate openGLView:self drawRect:rect];
 }
+-(BOOL) isOpaque{
+  return NO;
+}
 @end
 
 @interface OpenGLRenderer () <OpenGLRenderDelegate>
