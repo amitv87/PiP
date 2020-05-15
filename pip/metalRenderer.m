@@ -9,11 +9,14 @@
 #import "common.h"
 #import "imageRenderer.h"
 
+#import <MetalKit/MetalKit.h>
+#import <CoreImage/CoreImage.h>
+
 @interface MetalRenderer () <MTKViewDelegate>
-@property (nonatomic,strong) id<MTLDevice> device;
-@property (nonatomic,strong) id<MTLCommandQueue> commandQueue;
 @property (nonatomic,strong) MTKView *view;
 @property (nonatomic,strong) CIImage *image;
+@property (nonatomic,strong) id<MTLDevice> device;
+@property (nonatomic,strong) id<MTLCommandQueue> commandQueue;
 @end
 
 @implementation MetalRenderer{
@@ -36,12 +39,16 @@
   self.view.autoResizeDrawable = YES;
   self.view.enableSetNeedsDisplay = YES;
   colorspace = CGColorSpaceCreateDeviceRGB();
-  self.context = [CIContext contextWithMTLDevice:self.device options:@{kCIContextWorkingColorSpace: CFBridgingRelease(colorspace)}];
+  self.context = [CIContext contextWithMTLDevice:self.device options:@{kCIContextWorkingColorSpace: (__bridge id)colorspace}];
   self.commandQueue = [self.device newCommandQueue];
 
   imageScale = 0;
   cropRect = CGRectZero;
   return self;
+}
+
+- (void)dealloc{
+  CGColorSpaceRelease(colorspace);
 }
 
 - (void)setCropRect:(NSRect) rect{

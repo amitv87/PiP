@@ -9,9 +9,7 @@
 #ifndef imageRenderer_h
 #define imageRenderer_h
 
-#import <OpenGL/gl.h>
-#import <MetalKit/MetalKit.h>
-#import <CoreImage/CoreImage.h>
+#import <Cocoa/Cocoa.h>
 
 @protocol ImageRendererDelegate <NSObject>
 - (void)onResize:(CGSize)size andAspectRatio:(CGSize) ar;
@@ -19,8 +17,8 @@
 
 @protocol ImageRenderer <NSObject>
 @property (nonatomic,strong) CIContext *context;
-@property (nonatomic,strong) id<ImageRendererDelegate> delegate;
 @property (nonatomic,strong,readonly) NSView *view;
+@property (nonatomic,strong) id<ImageRendererDelegate> delegate;
 - (instancetype)init;
 - (NSRect)cropRect;
 - (void)setScale:(float) scale;
@@ -29,11 +27,11 @@
 @end
 
 @interface MetalRenderer : NSObject <ImageRenderer>
-@property (nonatomic,strong,readonly) MTKView *view;
+//@property (nonatomic,strong,readonly) MTKView *view;
 @end
 
 @interface OpenGLRenderer : NSObject <ImageRenderer>
-@property (nonatomic,strong,readonly) NSOpenGLView *view;
+//@property (nonatomic,strong,readonly) NSOpenGLView *view;
 @end
 
 #endif /* imageRenderer_h */

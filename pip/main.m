@@ -67,7 +67,6 @@ item.keyEquivalentModifierMask = mask; \
   ADD_ITEM(@"Minimize", performMiniaturize:, @"m");
   ADD_ITEM(@"Join all spaces", togglePin, @"j");
   ADD_ITEM(@"Bring All to Front", arrangeInFront:, @"");
-  ADD_ITEM(@"Toggle pin", togglePin, @"t");
   ADD_ITEM(@"Toggle Native PiP", toggleNativePip, @"p");
 
   [app setMainMenu:menubar];
@@ -101,7 +100,9 @@ item.keyEquivalentModifierMask = mask; \
 }
 
 - (void) newWindow{
-  [[[Window alloc] init] setIgnoresMouseEvents:clickThroughState];
+  NSWindow* window = [[Window alloc] init];
+  [window makeKeyAndOrderFront:self];
+  [window setIgnoresMouseEvents:clickThroughState];
 }
 
 - (void) hideAll{
@@ -120,7 +121,6 @@ item.keyEquivalentModifierMask = mask; \
 -(void)applicationDidFinishLaunching:(NSNotification *)notification{
   [app setActivationPolicy:NSApplicationActivationPolicyRegular];
   [app activateIgnoringOtherApps:YES];
-//  initGL();
   [self newWindow];
 }
 

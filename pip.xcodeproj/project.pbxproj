@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		554AA7FC1FDDB16200233377 /* Media.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 554AA7FB1FDDB16200233377 /* Media.xcassets */; };
 		559059281FDD13810003B647 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 55ABC4BB1FD2CB91005278DB /* main.m */; };
-		5590592A1FDD13810003B647 /* openGLView.m in Sources */ = {isa = PBXBuildFile; fileRef = 55B827BF1FD322A800DD51A3 /* openGLView.m */; };
 		5590592B1FDD13810003B647 /* selectionView.m in Sources */ = {isa = PBXBuildFile; fileRef = 55DDE8C81FD6BACF00B19D89 /* selectionView.m */; };
 		5590592C1FDD13810003B647 /* window.m in Sources */ = {isa = PBXBuildFile; fileRef = 55DDE8CB1FD6BC3A00B19D89 /* window.m */; };
 		55E7C039246D441300BE7DD9 /* imageView.m in Sources */ = {isa = PBXBuildFile; fileRef = 55E7C038246D441300BE7DD9 /* imageView.m */; };
@@ -26,8 +25,6 @@
 		55ABC4BB1FD2CB91005278DB /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		55ABC4C81FD2D3C5005278DB /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 		55ABC4CA1FD2DB73005278DB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
-		55B827BE1FD3228500DD51A3 /* openGLView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = openGLView.h; sourceTree = "<group>"; };
-		55B827BF1FD322A800DD51A3 /* openGLView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = openGLView.m; sourceTree = "<group>"; };
 		55D766F81FDB157100CA39E9 /* common.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = common.h; sourceTree = "<group>"; };
 		55DDE8C71FD6BAA400B19D89 /* selectionView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = selectionView.h; sourceTree = "<group>"; };
 		55DDE8C81FD6BACF00B19D89 /* selectionView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = selectionView.m; sourceTree = "<group>"; };
@@ -75,8 +72,6 @@
 			isa = PBXGroup;
 			children = (
 				55ABC4BB1FD2CB91005278DB /* main.m */,
-				55B827BE1FD3228500DD51A3 /* openGLView.h */,
-				55B827BF1FD322A800DD51A3 /* openGLView.m */,
 				55FEB9212115ECCC00D8350C /* pip.h */,
 				551EB2A5243B49AB002C6D34 /* cgs.h */,
 				55DDE8C71FD6BAA400B19D89 /* selectionView.h */,
@@ -177,7 +172,6 @@
 				55E7C03C246D4AC000BE7DD9 /* metalRenderer.m in Sources */,
 				559059281FDD13810003B647 /* main.m in Sources */,
 				55E7C039246D441300BE7DD9 /* imageView.m in Sources */,
-				5590592A1FDD13810003B647 /* openGLView.m in Sources */,
 				5590592B1FDD13810003B647 /* selectionView.m in Sources */,
 				55E7C03E246D4E6900BE7DD9 /* openGLRenderer.m in Sources */,
 				5590592C1FDD13810003B647 /* window.m in Sources */,

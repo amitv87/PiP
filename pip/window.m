@@ -26,9 +26,12 @@ static CGRect kStartRect = {
 
 static const bool shouldEnableFullScreen = false;
 
-static NSWindowStyleMask kWindowMask = NSWindowStyleMaskBorderless | NSWindowStyleMaskResizable
-  | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
-  | NSWindowStyleMaskTexturedBackground | NSWindowStyleMaskUnifiedTitleAndToolbar | NSWindowStyleMaskFullSizeContentView
+static NSWindowStyleMask kWindowMask = NSWindowStyleMaskBorderless
+  | NSWindowStyleMaskTitled
+  | NSWindowStyleMaskClosable
+  | NSWindowStyleMaskResizable
+  | NSWindowStyleMaskMiniaturizable
+  | NSWindowStyleMaskFullSizeContentView
   | NSWindowStyleMaskNonactivatingPanel
 ;
 
@@ -155,7 +158,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   self.maskImage = [NSImage swatchWithColor:[NSColor blackColor] size:NSMakeRect(0, 0, sideLen, sideLen).size];
 
   button = [[CircularButton alloc] initWithRadius:radius];
-  [button setButtonType:NSMomentaryChangeButton];
+  [button setButtonType:NSButtonTypeMomentaryChange];
   [button setBordered:NO];
   [button setAction:@selector(onClick:)];
   [button setTarget:self];
@@ -239,7 +242,6 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   NSViewController* nvc;
   PIPViewController* pvc;
   SelectionView* selectionView;
-  NSTitlebarAccessoryViewController* tbavc;
 
   ImageView* imageView;
 }
@@ -270,14 +272,13 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   self.level = NSFloatingWindowLevel;
   self.movableByWindowBackground = YES;
   self.titlebarAppearsTransparent = true;
+//  self.backgroundColor = NSColor.clearColor;
   self.aspectRatio = kStartRect.size;
   self.minSize = NSMakeSize(kMinSize, kMinSize);
   self.maxSize = [[self screen] visibleFrame].size;
   self.preservesContentDuringLiveResize = false;
   self.collectionBehavior = NSWindowCollectionBehaviorManaged | NSWindowCollectionBehaviorParticipatesInCycle |
   (shouldEnableFullScreen ? NSWindowCollectionBehaviorFullScreenPrimary : NSWindowCollectionBehaviorFullScreenAuxiliary);
-
-  [self makeKeyAndOrderFront:self];
 
   selectionView = [[SelectionView alloc] init];
   selectionView.delegate = self;
@@ -289,9 +290,6 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   butCont = [[NSView alloc] initWithFrame:butContRect];
   butCont.translatesAutoresizingMaskIntoConstraints = false;
 
-  #define NSColorFromRGB(rgbValue, opacity) [NSColor colorWithRed:((float)((rgbValue & 0xFF0000) >> 16))/255.0 \
-    green:((float)((rgbValue & 0xFF00) >> 8))/255.0 blue:((float)(rgbValue & 0xFF))/255.0 alpha:opacity]
-
   popbutt = [[Button alloc] initWithRadius:buttonRadius andImage:GET_IMG(pop) andImageScale:butScale];
   [popbutt setDelegate:self];
   [popbutt setFrameOrigin:NSMakePoint(round((NSWidth([butCont bounds]) - NSWidth([popbutt frame])) / 2) - (buttonRadius + 7.5), 0)];
@@ -302,20 +300,12 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   [playbutt setFrameOrigin:NSMakePoint(round((NSWidth([butCont bounds]) - NSWidth([playbutt frame])) / 2) + (buttonRadius + 7.5), 0)];
   [butCont addSubview:playbutt];
 
-  int ppbutradius = 6.5;
-  float butspacing = ppbutradius * 3;
+  int ppbutradius = 10;
   pinbutt = [[Button alloc] initWithRadius:ppbutradius andImage:nil andImageScale:1.8];
-  [pinbutt setFrameOrigin:NSMakePoint(0 * butspacing, 5)];
-  [pinbutt setDelegate:self];
+  pinbutt.delegate = self;
+  pinbutt.translatesAutoresizingMaskIntoConstraints = false;
+  pinbutt.frameOrigin = NSMakePoint(ppbutradius, ppbutradius);
   [self setupPushPin:false];
-
-  NSView* view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 1 * butspacing, 0)];
-  [view addSubview:pinbutt];
-
-  tbavc = [[NSTitlebarAccessoryViewController alloc] init];
-  tbavc.view = view;
-  tbavc.layoutAttribute = NSLayoutAttributeTrailing;
-  [self addTitlebarAccessoryViewController:tbavc];
 
   rootView = [[RootView alloc] initWithFrame:kStartRect];
   rootView.delegate = self;
@@ -326,18 +316,22 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
   imageView = [[ImageView alloc] initWithFrame:kStartRect];
   imageView.renderer = [[MetalRenderer alloc] init];
+//  imageView.renderer = [[OpenGLRenderer alloc] init];
   imageView.renderer.delegate = self;
   imageView.hidden = true;
+
   [rootView addSubview:imageView];
-
   [rootView addSubview:butCont];
+  [rootView addSubview:pinbutt];
 
-  NSLayoutConstraint* constCentX = [NSLayoutConstraint constraintWithItem:butCont attribute:NSLayoutAttributeCenterX relatedBy:NSLayoutRelationEqual toItem:rootView attribute:NSLayoutAttributeCenterX multiplier:1 constant:-butContRect.origin.x];
-  NSLayoutConstraint* constBottom = [NSLayoutConstraint constraintWithItem:butCont attribute:NSLayoutAttributeBottom relatedBy:NSLayoutRelationEqual toItem:rootView attribute:NSLayoutAttributeBottom multiplier:1 constant:-butContRect.origin.y];
-  NSLayoutConstraint* constWindth = [NSLayoutConstraint constraintWithItem:butCont attribute:NSLayoutAttributeWidth relatedBy:NSLayoutRelationEqual toItem:nil attribute:NSLayoutAttributeWidth multiplier:1 constant:butContRect.size.width];
-  NSLayoutConstraint* constHeight = [NSLayoutConstraint constraintWithItem:butCont attribute:NSLayoutAttributeHeight relatedBy:NSLayoutRelationEqual toItem:nil attribute:NSLayoutAttributeHeight multiplier:1 constant:butContRect.size.height];
+  NSRect pinbutRect = pinbutt.frame;
+  [[pinbutt.widthAnchor constraintEqualToConstant:pinbutRect.size.width] setActive:true];
+  [[pinbutt.heightAnchor constraintEqualToConstant:pinbutRect.size.height] setActive:true];
+  [[pinbutt.topAnchor constraintEqualToAnchor:rootView.topAnchor constant:pinbutRect.origin.x] setActive:true];
+  [[pinbutt.rightAnchor constraintEqualToAnchor:rootView.rightAnchor constant:-pinbutRect.origin.y] setActive:true];
 
-  [rootView addConstraints:@[constCentX, constBottom, constWindth, constHeight]];
+  [[butCont.widthAnchor constraintEqualToConstant:butContRect.size.width] setActive:true];
+  [[butCont.centerXAnchor constraintEqualToAnchor:rootView.centerXAnchor constant:-butContRect.origin.x] setActive:true];
 
   NSTrackingAreaOptions nstopts = NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways | NSTrackingInVisibleRect | NSTrackingAssumeInside;
   NSTrackingArea *nstArea = [[NSTrackingArea alloc] initWithRect:[[self contentView] frame] options:nstopts owner:self userInfo:nil];
@@ -382,6 +376,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   if([self isFullScreen]) alphaVal = true;
   if(pvc) alphaVal = false;
   if(self.ignoresMouseEvents) alphaVal = false;
+  [[pinbutt animator] setAlphaValue:alphaVal];
   [[butCont animator] setAlphaValue:alphaVal];
   [[[[self standardWindowButton:NSWindowCloseButton] superview] animator] setAlphaValue:alphaVal];
 }
@@ -785,10 +780,8 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   [playbutt removeFromSuperview];
   [selectionView removeFromSuperview];
   [rootView removeFromSuperview];
-  [tbavc removeFromParentViewController];
 
   nvc = NULL;
-  tbavc = NULL;
   timer = NULL;
   rootView = NULL;
   butCont = NULL;

@@ -63,7 +63,7 @@
   [self removeFromSuperview];
   [[NSCursor arrowCursor] set];
 
-  [self.delegate onSelcetion:NSMakeRect(x, y, width, height)];
+  if(width * height >= 400) [self.delegate onSelcetion:NSMakeRect(x, y, width, height)];
 }
 
 @end
