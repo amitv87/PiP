@@ -52,6 +52,7 @@ item.keyEquivalentModifierMask = mask; \
 
   INIT_MENU(@"File");
   ADD_ITEM(@"New", newWindow, @"n");
+  ADD_ITEM(@"Click Through", clickThrough:, @"c");
   ADD_ITEM(@"Close", performClose:, @"w");
 
   INIT_MENU(@"Window");
