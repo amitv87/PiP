@@ -126,7 +126,7 @@ item.keyEquivalentModifierMask = mask; \
 }
 
 -(BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender{
-  NSLog(@"wc: %lu", (unsigned long)[app windows].count);
+//  NSLog(@"wc: %lu", (unsigned long)[app windows].count);
   return false;
 }
 

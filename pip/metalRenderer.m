@@ -97,7 +97,7 @@
     targetSize = size;
   }
 
-  if(arr < 0.999 || arr > 1.001) [self.delegate onResize:targetSize andAspectRatio:targetSize];
+  if(arr < 0.99 || arr > 1.01) [self.delegate onResize:targetSize andAspectRatio:targetSize];
 
   float scale = targetSize.width / imageSize.width;
   image = (scale < 0.99 || scale > 1.01) ? [image imageByApplyingTransform:CGAffineTransformMakeScale(scale, scale)] : image;

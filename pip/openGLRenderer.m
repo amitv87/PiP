@@ -104,7 +104,7 @@ static CIContext* getCIContext(){
     targetSize = size;
   }
 
-  if(arr < 0.999 || arr > 1.001) [self.delegate onResize:targetSize andAspectRatio:targetSize];
+  if(arr < 0.99 || arr > 1.01) [self.delegate onResize:targetSize andAspectRatio:targetSize];
 
   NSRect fromRect = cropRect.size.width * cropRect.size.height == 0 ? self.image.extent : cropRect;
 
