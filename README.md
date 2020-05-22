@@ -27,7 +27,7 @@ Always on top window preview similar to the popular windows only OnTopReplica
 
 ### Manual download
 
-[PiP-1.30.dmg](https://github.com/amitv87/PiP/releases/download/1.30/PiP-1.30.dmg)
+[PiP-1.40.dmg](https://github.com/amitv87/PiP/releases/download/v1.40/PiP-1.40.dmg)
 
 ### Download and install via Homebrew
 
