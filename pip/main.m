@@ -115,7 +115,7 @@ item.keyEquivalentModifierMask = mask; \
   clickThroughState = !item.state;
   [item setState:clickThroughState];
   for(NSWindow* window in [app windows]){
-    if([window isKindOfClass:[NSWindow class]]) [window setIgnoresMouseEvents:clickThroughState];
+    if([window isKindOfClass:[Window class]]) [window setIgnoresMouseEvents:clickThroughState];
   }
 }
 
