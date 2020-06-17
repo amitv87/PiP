@@ -6,7 +6,7 @@ Always on top window preview similar to the popular windows only OnTopReplica
 
 ## Code Info
 * Nibless cocoa app
-* OpenGL based renderer
+* OpenGL/Metal renderer
 * CoreGraphics based capturer (looking for alternative)
 * No third party dependency
 * Uses private framework for native pip support
