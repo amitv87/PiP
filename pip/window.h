@@ -20,6 +20,7 @@
 @end
 
 @protocol RootViewDelegate <NSObject>
+- (void)onDoubleClick:(NSEvent *)theEvent;
 - (void)rightMouseDown:(NSEvent *)theEvent;
 @end
 

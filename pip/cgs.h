@@ -9,7 +9,11 @@
 #ifndef cgs_h
 #define cgs_h
 
-#include <CoreGraphics/CGWindow.h>
+#include <CoreGraphics/CoreGraphics.h>
+
+#define kCPSAllWindows    0x100
+#define kCPSUserGenerated 0x200
+#define kCPSNoWindows     0x400
 
 typedef int CGSConnectionID;
 
@@ -30,6 +34,15 @@ typedef enum {
 } CGSSpaceMask;
 
 CGSConnectionID CGSMainConnectionID(void);
+
+CGError SLPSPostEventRecordTo(ProcessSerialNumber *psn, uint8_t *bytes);
+CGError CGSGetConnectionPSN(CGSConnectionID cid, ProcessSerialNumber *psn);
+CGError CGSGetWindowOwner(CGSConnectionID cid, CGWindowID wid, CGSConnectionID *ownerCid);
+CGError CGSConnectionGetPID(CGSConnectionID cid, pid_t *pid, CGSConnectionID ownerCid);
+CGError SLPSSetFrontProcessWithOptions(ProcessSerialNumber *psn, CGWindowID wid, uint32_t mode);
+
+OSStatus CGSGetConnectionIDForPSN(CGSConnectionID cid, ProcessSerialNumber *psn, CGSConnectionID *out);
+
 CFArrayRef CGSCopySpacesForWindows(CGSConnectionID cid, CGSSpaceMask mask, CFArrayRef windowIDs);
 CFArrayRef CGSHWCaptureWindowList(CGSConnectionID, CGWindowID* windowList, int count, CGSWindowCaptureOptions);
 

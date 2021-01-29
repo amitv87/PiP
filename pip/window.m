@@ -29,12 +29,12 @@ static NSWindowStyleMask kWindowMask = NSWindowStyleMaskBorderless
   | NSWindowStyleMaskNonactivatingPanel
 ;
 
-bool isInside(int rad, CGPoint cirlce, CGPoint point){
+static bool isInside(int rad, CGPoint cirlce, CGPoint point){
   if ((point.x - cirlce.x) * (point.x - cirlce.x) + (point.y - cirlce.y) * (point.y - cirlce.y) <= rad * rad) return true;
   else return false;
 }
 
-void setWindowSize(NSWindow* window, NSRect windowRect, NSRect screenRect, NSSize size, bool animate){
+static void setWindowSize(NSWindow* window, NSRect windowRect, NSRect screenRect, NSSize size, bool animate){
   float screenWidth = screenRect.origin.x + screenRect.size.width;
   float screenHeight = screenRect.origin.y + screenRect.size.height;
 
@@ -68,6 +68,109 @@ void setWindowSize(NSWindow* window, NSRect windowRect, NSRect screenRect, NSSiz
 
 @implementation WindowSel
 @end
+
+AXError _AXUIElementGetWindow(AXUIElementRef window, CGWindowID *windowID);
+
+static AXUIElementRef GetUIElement(CGWindowID win) {
+  // Window PID
+  pid_t pid = 0;
+
+  // Create array storing window
+  CFArrayRef wlist = CFArrayCreate(NULL, (const void ** ) &win, 1, NULL);
+
+  // Get window info
+  CFArrayRef info = CGWindowListCreateDescriptionFromArray(wlist);
+  CFRelease(wlist);
+
+  // Check whether the resulting array is populated
+  if (info != NULL && CFArrayGetCount(info) > 0) {
+    // Retrieve description from info array
+    CFDictionaryRef desc = (CFDictionaryRef)
+    CFArrayGetValueAtIndex(info, 0);
+
+    // Get window PID
+    CFNumberRef data = (CFNumberRef)
+    CFDictionaryGetValue(desc, kCGWindowOwnerPID);
+
+    if (data != NULL) CFNumberGetValue(data, kCFNumberIntType, & pid);
+
+    // Return result
+    CFRelease(info);
+  }
+
+  // Check if PID was retrieved
+  if (pid <= 0) return NULL;
+
+  // Create an accessibility object using retrieved PID
+  AXUIElementRef application = AXUIElementCreateApplication(pid);
+  if (application == NULL) return NULL;
+
+  CFArrayRef windows = NULL;
+  // Get all windows associated with the app
+  AXUIElementCopyAttributeValues(application, kAXWindowsAttribute, 0, 1024, & windows);
+
+  // Reference to resulting value
+  AXUIElementRef result = NULL;
+
+  if (windows != NULL) {
+    CFIndex count = CFArrayGetCount(windows);
+    // Loop all windows in the process
+    for (CFIndex i = 0; i < count; ++i) {
+      // Get the element at the index
+      AXUIElementRef element = (AXUIElementRef)
+      CFArrayGetValueAtIndex(windows, i);
+
+      CGWindowID temp = 0;
+      // Use undocumented API to get WindowID
+      _AXUIElementGetWindow(element, & temp);
+
+      // Check results
+      if (temp == win) {
+        // Retain element
+        CFRetain(element);
+        result = element;
+        break;
+      }
+    }
+
+    CFRelease(windows);
+  }
+
+  CFRelease(application);
+  return result;
+}
+
+static void bringWindoToForeground(CGWindowID wid){
+  AXUIElementRef window_ref = GetUIElement(wid);
+  if(!window_ref) return;
+  ProcessSerialNumber psn;
+  CGSConnectionID cid = CGSMainConnectionID(), ownerCid;
+  CGSGetWindowOwner(cid, wid, &ownerCid);
+  CGSGetConnectionPSN(ownerCid, &psn);
+  SLPSSetFrontProcessWithOptions(&psn, wid, kCPSUserGenerated);
+
+  uint8_t bytes1[0xf8] = {
+      [0x04] = 0xF8,
+      [0x08] = 0x01,
+      [0x3a] = 0x10
+  };
+
+  uint8_t bytes2[0xf8] = {
+      [0x04] = 0xF8,
+      [0x08] = 0x02,
+      [0x3a] = 0x10
+  };
+
+  memcpy(bytes1 + 0x3c, &wid, sizeof(uint32_t));
+  memset(bytes1 + 0x20, 0xFF, 0x10);
+  memcpy(bytes2 + 0x3c, &wid, sizeof(uint32_t));
+  memset(bytes2 + 0x20, 0xFF, 0x10);
+  SLPSPostEventRecordTo(&psn, bytes1);
+  SLPSPostEventRecordTo(&psn, bytes2);
+
+  AXUIElementPerformAction(window_ref, kAXRaiseAction);
+  CFRelease(window_ref);
+}
 
 static CGImageRef CaptureWindow(CGWindowID wid){
   CGImageRef window_image = NULL;
@@ -194,6 +297,11 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
 - (void)rightMouseDown:(NSEvent *)theEvent{
   if(self.delegate)[self.delegate rightMouseDown:theEvent];
+}
+
+- (void)mouseUp:(NSEvent *)theEvent{
+  if([theEvent clickCount] == 2) if(self.delegate)[self.delegate onDoubleClick:theEvent];
+//  NSLog(@"click count %ld", (long)[theEvent clickCount]);
 }
 
 - (void)magnifyWithEvent:(NSEvent *)event{
@@ -586,6 +694,10 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   [self changeWindow:item];
 }
 
+- (void)onDoubleClick:(NSEvent *)theEvent{
+  if(window_id > 0) bringWindoToForeground(window_id);
+}
+
 - (void)rightMouseDown:(NSEvent *)theEvent {
   NSMenu *theMenu = [[NSMenu alloc] init];
   [theMenu setMinimumWidth:100];
@@ -709,6 +821,10 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
   window_id = sel.winId;
   [self startTimer:1.0/refreshRate];
+
+  [self setMovable:YES];
+  [selectionView removeFromSuperview];
+  [[NSCursor arrowCursor] set];
 
   [imageView setImage:nil];
   [imageView setHidden:window_id == 0];

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		554AA7FC1FDDB16200233377 /* Media.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 554AA7FB1FDDB16200233377 /* Media.xcassets */; };
+		55851A0625C4180500AC5A8B /* SkyLight.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 558519F625C3FFCF00AC5A8B /* SkyLight.framework */; };
 		559059281FDD13810003B647 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 55ABC4BB1FD2CB91005278DB /* main.m */; };
 		5590592B1FDD13810003B647 /* selectionView.m in Sources */ = {isa = PBXBuildFile; fileRef = 55DDE8C81FD6BACF00B19D89 /* selectionView.m */; };
 		5590592C1FDD13810003B647 /* window.m in Sources */ = {isa = PBXBuildFile; fileRef = 55DDE8CB1FD6BC3A00B19D89 /* window.m */; };
@@ -22,6 +23,7 @@
 		552115841FDD120F00F90350 /* PiP.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PiP.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		554AA7DC1FDDADEE00233377 /* info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = info.plist; sourceTree = "<group>"; };
 		554AA7FB1FDDB16200233377 /* Media.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Media.xcassets; sourceTree = "<group>"; };
+		558519F625C3FFCF00AC5A8B /* SkyLight.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SkyLight.framework; path = ../../../../System/Library/PrivateFrameworks/SkyLight.framework; sourceTree = "<group>"; };
 		55ABC4BB1FD2CB91005278DB /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		55ABC4C81FD2D3C5005278DB /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 		55ABC4CA1FD2DB73005278DB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
@@ -45,6 +47,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				55FEB9202115EA9A00D8350C /* PIP.framework in Frameworks */,
+				55851A0625C4180500AC5A8B /* SkyLight.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -93,6 +96,7 @@
 		55ABC4C21FD2D2DD005278DB /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				558519F625C3FFCF00AC5A8B /* SkyLight.framework */,
 				55FEB91F2115EA9A00D8350C /* PIP.framework */,
 				55ABC4CA1FD2DB73005278DB /* Cocoa.framework */,
 				55ABC4C81FD2D3C5005278DB /* CoreGraphics.framework */,
