@@ -32,7 +32,7 @@ Always on top window preview similar to the popular windows only OnTopReplica
 ### Download and install via Homebrew
 
 ```
-brew cask install amitv87-pip
+brew install --cask amitv87-pip
 ```
 
 ### Build from source and run
