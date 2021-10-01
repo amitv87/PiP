@@ -18,6 +18,7 @@ Always on top window preview similar to the popular windows only OnTopReplica
 * Multiple window preview from same process, ```cmd+n``` to open and ```cmd+w``` to close
 * Pinch to zoom
 * Native picture in picture support ```cmd+p```
+* Transparency/opacity control (slider in right click menu)
 * Minimal modern UI
 
 ## To do
