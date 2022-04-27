@@ -1,6 +1,7 @@
 # Mac OS X Picture in Picture
 
 Always on top window preview similar to the popular windows only OnTopReplica
+Now with AirPlay receiver support (if on macOS 12+, turn-off built-in AirPlay receiver from system preferences)
 
 [![PiP demo](https://img.youtube.com/vi/MDte5sZCRnY/0.jpg)](https://www.youtube.com/watch?v=MDte5sZCRnY)
 
