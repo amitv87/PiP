@@ -10,6 +10,8 @@
 #import "img.h"
 #import "common.h"
 #import "window.h"
+#import "audioPlayer.h"
+#import "H264Decoder.h"
 
 #define GET_IMG(x) [[NSImage alloc] initWithData:[NSData dataWithBytes:img_##x##_png length:img_##x##_png_len]]
 
@@ -17,8 +19,6 @@ static CGRect kStartRect = {
   .origin = {.x = 0, .y = 0,},
   .size = {.width = kStartSize, .height = kStartSize,},
 };
-
-static const bool shouldEnableFullScreen = false;
 
 static NSWindowStyleMask kWindowMask = NSWindowStyleMaskBorderless
   | NSWindowStyleMaskTitled
@@ -234,7 +234,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
 @end
 
-@implementation Button{
+@implementation VButton{
   int radius;
   NSButton* button;
 }
@@ -331,9 +331,9 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 @implementation Window{
   NSTimer* timer;
   NSView* butCont;
-  Button* pinbutt;
-  Button* popbutt;
-  Button* playbutt;
+  VButton* pinbutt;
+  VButton* popbutt;
+  VButton* playbutt;
   float contentAR;
   int refreshRate;
   bool shouldClose;
@@ -346,9 +346,18 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   SelectionView* selectionView;
 
   ImageView* imageView;
+
+  AudioPlayer* audPlayer;
+  H264Decoder* h264decoder;
+
+  NSString* airplay_title;
+  bool is_playing;
+  bool is_airplay_session;
+  bool shouldEnableFullScreen;
 }
 
-- (id) init{
+//- (id) init{
+- (id) initWithAirplay:(bool)enable andTitle:(NSString*)title{
   pvc = nil;
   timer = NULL;
   window_id = 0;
@@ -356,6 +365,11 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   shouldClose = false;
   isWinClosing = false;
   isPipCLosing = false;
+  
+  airplay_title = title;
+
+  shouldEnableFullScreen = true;
+  is_playing = is_airplay_session = enable;
 
   self = [super initWithContentRect:kStartRect styleMask:kWindowMask backing:NSBackingStoreBuffered defer:YES];
 
@@ -392,18 +406,18 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   butCont = [[NSView alloc] initWithFrame:butContRect];
   butCont.translatesAutoresizingMaskIntoConstraints = false;
 
-  popbutt = [[Button alloc] initWithRadius:buttonRadius andImage:GET_IMG(pop) andImageScale:butScale];
+  popbutt = [[VButton alloc] initWithRadius:buttonRadius andImage:GET_IMG(pop) andImageScale:butScale];
   [popbutt setDelegate:self];
   [popbutt setFrameOrigin:NSMakePoint(round((NSWidth([butCont bounds]) - NSWidth([popbutt frame])) / 2) - (buttonRadius + 7.5), 0)];
   [butCont addSubview:popbutt];
 
-  playbutt = [[Button alloc] initWithRadius:buttonRadius andImage:GET_IMG(play) andImageScale:butScale];
+  playbutt = [[VButton alloc] initWithRadius:buttonRadius andImage:GET_IMG(play) andImageScale:butScale];
   [playbutt setDelegate:self];
   [playbutt setFrameOrigin:NSMakePoint(round((NSWidth([butCont bounds]) - NSWidth([playbutt frame])) / 2) + (buttonRadius + 7.5), 0)];
   [butCont addSubview:playbutt];
 
   int ppbutradius = 10;
-  pinbutt = [[Button alloc] initWithRadius:ppbutradius andImage:nil andImageScale:1.8];
+  pinbutt = [[VButton alloc] initWithRadius:ppbutradius andImage:nil andImageScale:1.8];
   pinbutt.delegate = self;
   pinbutt.translatesAutoresizingMaskIntoConstraints = false;
   pinbutt.frameOrigin = NSMakePoint(ppbutradius, ppbutradius);
@@ -420,7 +434,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 //  imageView.renderer = [[MetalRenderer alloc] init];
   imageView.renderer = [[OpenGLRenderer alloc] init];
   imageView.renderer.delegate = self;
-  imageView.hidden = true;
+  imageView.hidden = !is_airplay_session;
 
   [rootView addSubview:imageView];
   [rootView addSubview:butCont];
@@ -444,8 +458,15 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   [nvc setView:rootView];
   [self setContentViewController:nvc];
 
+  if(is_airplay_session){
+    audPlayer = [[AudioPlayer alloc] init];
+    h264decoder = [[H264Decoder alloc] init];
+  }
+
 //  [self onMouseEnter:false];
-  [self setOnwer:@"PiP" withTitle:@"(right click to begin)"];
+  [self setOnwer:@"PiP" withTitle:is_airplay_session ? airplay_title : @"(right click to begin)"];
+
+  [self resetPlaybackSate];
 
   return self;
 }
@@ -459,7 +480,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   else [self setTitle:[NSString localizedStringWithFormat:@"%@ - %@", owner, title]];
 }
 
-- (void) onClick:(Button*)button{
+- (void) onClick:(VButton*)button{
   if(button == playbutt) [self togglePlayback];
   else if(button == popbutt) [self toggleNativePip];
   else if(button == pinbutt) [self togglePin];
@@ -485,6 +506,11 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
 - (void)setupPushPin:(bool)active{
   [pinbutt setImage:active ? GET_IMG(pinned) : GET_IMG(pin)];
+}
+
+- (void)toggleFloat{
+  if(self.level == NSFloatingWindowLevel) self.level = NSNormalWindowLevel;
+  else self.level = NSFloatingWindowLevel;
 }
 
 - (void)togglePin{
@@ -539,8 +565,14 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
 - (void)togglePlayback{
   if(isWinClosing) return;
-  if(timer) [self stopTimer];
-  else [self startTimer:1.0/refreshRate];
+  if(is_airplay_session){
+    is_playing = !is_playing;
+    [self resetPlaybackSate];
+  }
+  else{
+    if(timer) [self stopTimer];
+    else [self startTimer:1.0/refreshRate];
+  }
 }
 
 - (void)toggleNativePip{
@@ -553,8 +585,8 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 }
 
 - (void)resetPlaybackSate{
-  if(pvc) pvc.playing = timer;
-  if(timer) [playbutt setImage:GET_IMG(pause)];
+  if(pvc) pvc.playing = timer || is_playing;
+  if(timer || is_playing) [playbutt setImage:GET_IMG(pause)];
   else [playbutt setImage:GET_IMG(play)];
 }
 
@@ -593,13 +625,12 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
 - (void)pipActionPause:(PIPViewController *)pip{
 //  NSLog(@"pipActionPause");
-  [self stopTimer];
+  [self togglePlayback];
 }
 
 - (void)pipActionPlay:(PIPViewController *)pip{
 //  NSLog(@"pipActionPlay");
-  if(window_id) [self startTimer:1.0/refreshRate];
-  else [self stopTimer];
+  [self togglePlayback];
 }
 
 - (void)pipActionReturn:(PIPViewController *)pip{
@@ -635,13 +666,13 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 //  NSLog(@"startTimer %f", interval);
   [self stopTimer];
   if(window_id == 0) return;
-  timer = [NSTimer timerWithTimeInterval:interval target:self selector:@selector(captrue) userInfo:nil repeats:YES];
+  timer = [NSTimer timerWithTimeInterval:interval target:self selector:@selector(capture) userInfo:nil repeats:YES];
   [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
   [self resetPlaybackSate];
 }
 
 - (void)onResize:(CGSize)size andAspectRatio:(CGSize) ar{
-  if(window_id == 0) return;
+  if(window_id == 0 && !is_airplay_session) return;
   [self setAspectRatio:ar];
   if(pvc) [pvc setAspectRatio:ar];
   else{
@@ -655,7 +686,28 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   [imageView.renderer setCropRect:rect];
 }
 
-- (void)captrue{
+- (void) setAudioInputFormat:(UInt32)format withsampleRate:(UInt32)sampleRate andChannels:(UInt32)channelCount andSPF:(UInt32)spf{
+  [audPlayer setInputFormat:format withSampleRate:sampleRate andChannels:channelCount andSPF:spf];
+}
+
+- (void) setVolume:(float)volume{
+  [audPlayer setVolume:volume];
+}
+
+- (void) renderAudio:(uint8_t*) data withLength:(size_t) length{
+  if(!self->is_playing) return;
+  [audPlayer decode:data andLength:length];
+}
+
+- (void) renderH264:(uint8_t*) data withLength:(size_t) length{
+  [h264decoder decode:data withLength:length andReturnDecodedData:^(CVPixelBufferRef pixelBuffer){
+    if(!self->is_playing) return;
+    CIImage* image = [CIImage imageWithCVPixelBuffer:pixelBuffer];
+    dispatch_async(dispatch_get_main_queue(), ^{[self->imageView setImage:image];});
+  }];
+}
+
+- (void)capture{
   CGImageRef window_image = CaptureWindow(window_id);
   if(window_image != NULL){
     CIImage* ciimage = [CIImage imageWithCGImage:window_image];
@@ -704,15 +756,19 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   NSMenuItem* item = [theMenu addItemWithTitle:[NSString stringWithFormat:@"%snative pip", (pvc ? "exit " : "") ] action:@selector(toggleNativePip) keyEquivalent:@""];
   [item setTarget:self];
 
-  if(!pvc){
+  if(!pvc && (window_id != 0 || is_airplay_session)){
     NSSize cropSize = [imageView.renderer cropRect].size;
-    if(cropSize.width * cropSize.height == 0 && window_id != 0){
+    if(cropSize.width * cropSize.height == 0){
       NSMenuItem* item = [theMenu addItemWithTitle:@"select region" action:@selector(selectRegion:) keyEquivalent:@""];
+      [item setTarget:self];
+    }
+    else{
+      NSMenuItem* item = [theMenu addItemWithTitle:@"clear region" action:@selector(clearSelection:) keyEquivalent:@""];
       [item setTarget:self];
     }
   }
 
-  if(window_id != 0){
+  if(window_id != 0 && !is_airplay_session){
     NSMenuItem* item = [theMenu addItemWithTitle:@"clear window" action:@selector(changeWindow:) keyEquivalent:@""];
     [item setTarget:self];
     WindowSel* sel = [[WindowSel alloc] init];
@@ -739,6 +795,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
     [theMenu addItem:itemSlider];
   }
 
+  if(is_airplay_session) goto end;
   [theMenu addItem:[NSMenuItem separatorItem]];
 
   uint32_t windowId = 0;
@@ -797,11 +854,13 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   }
 
   CFRelease(all_windows);
+
+end:
   [NSMenu popUpContextMenu:theMenu withEvent:theEvent forView:rootView];
 }
 
 - (void)setScale:(id)sender{
-  if(window_id > 0) [imageView.renderer setScale:[sender tag]];
+  if(window_id > 0 || is_airplay_session) [imageView.renderer setScale:[sender tag]];
 }
 
 - (void)adjustOpacity:(id)sender{
@@ -824,7 +883,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
   [self setMovable:YES];
   [selectionView removeFromSuperview];
-  [[NSCursor arrowCursor] set];
+  dispatch_async(dispatch_get_main_queue(), ^{[[NSCursor arrowCursor] set];});
 
   [imageView setImage:nil];
   [imageView setHidden:window_id == 0];
@@ -835,7 +894,11 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   [self setMovable:NO];
   [selectionView setFrameSize:NSMakeSize(imageView.bounds.size.width, imageView.bounds.size.height)];
   [imageView addSubview:selectionView];
-  [[NSCursor crosshairCursor] set];
+  dispatch_async(dispatch_get_main_queue(), ^{[[NSCursor crosshairCursor] set];});
+}
+
+- (void)clearSelection:(id)sender{
+  [self onSelcetion:CGRectZero];
 }
 
 - (void)cancel:(id)arg1{}
@@ -901,6 +964,12 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   selectionView = NULL;
 
   [self setContentViewController:nil];
+
+  void airplay_receiver_session_stop(void* conn);
+  if(is_airplay_session) airplay_receiver_session_stop(self.conn);
+
+  if(audPlayer) [audPlayer destroy]; audPlayer = nil;
+  if(h264decoder) [h264decoder destroy]; h264decoder = nil;
 
   [super close];
 }

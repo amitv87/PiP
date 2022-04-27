@@ -12,11 +12,10 @@
 #import "pip.h"
 #import "imageView.h"
 #import "selectionView.h"
-
-@class Button;
+@class VButton;
 
 @protocol ButtonDelegate <NSObject>
-- (void) onClick:(Button*)button;
+- (void) onClick:(VButton*)button;
 @end
 
 @protocol RootViewDelegate <NSObject>
@@ -35,7 +34,7 @@
 @property (nonatomic) id<RootViewDelegate> delegate;
 @end
 
-@interface Button : NSVisualEffectView
+@interface VButton : NSVisualEffectView
 @property (nonatomic) id<ButtonDelegate> delegate;
 @property (nonatomic) float imageScale;
 - (id) initWithRadius:(int)radius andImage:(NSImage*) img andImageScale:(float)scale;
@@ -45,5 +44,11 @@
 @end
 
 @interface Window : NSPanel<NSWindowDelegate, SelectionViewDelegate, ImageRendererDelegate, WindowDelegate, RootViewDelegate, ButtonDelegate, PIPViewControllerDelegate>
+@property (nonatomic) void* conn;
+- (id) initWithAirplay:(bool)enable andTitle:(NSString*)title;
+- (void) renderH264:(uint8_t*) data withLength:(size_t) length;
+- (void) renderAudio:(uint8_t*) data withLength:(size_t) length;
+- (void) setVolume:(float)volume;
+- (void) setAudioInputFormat:(UInt32)format withsampleRate:(UInt32)sampleRate andChannels:(UInt32)channelCount andSPF:(UInt32)spf;
 @end
 #endif /* Window_h */
