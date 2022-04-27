@@ -7,6 +7,7 @@
 //
 
 #import "window.h"
+#import <AVFoundation/AVFoundation.h>
 
 extern int windowCount;
 
@@ -66,6 +67,7 @@ item.keyEquivalentModifierMask = mask; \
   ADD_SEP();
   ADD_ITEM_MASK(@"Zoom", performZoom:, @"z", NSEventModifierFlagCommand | NSEventModifierFlagOption);
   ADD_ITEM(@"Minimize", performMiniaturize:, @"m");
+//  ADD_ITEM(@"Always on top", toggleFloat, @"a");
   ADD_ITEM(@"Join all spaces", togglePin, @"j");
   ADD_ITEM(@"Bring All to Front", arrangeInFront:, @"");
   ADD_ITEM(@"Toggle Native PiP", toggleNativePip, @"p");
@@ -100,10 +102,11 @@ item.keyEquivalentModifierMask = mask; \
   if(currentWindow) cb((Window*)currentWindow);
 }
 
-- (void) newWindow{
-  NSWindow* window = [[Window alloc] init];
+- (NSWindow*) newWindow{
+  NSWindow* window = [[Window alloc] initWithAirplay: false andTitle:nil];
   [window makeKeyAndOrderFront:self];
   [window setIgnoresMouseEvents:clickThroughState];
+  return window;
 }
 
 - (void) hideAll{
@@ -123,7 +126,16 @@ item.keyEquivalentModifierMask = mask; \
   [app setActivationPolicy:NSApplicationActivationPolicyRegular];
   [app activateIgnoringOtherApps:YES];
   [self newWindow];
+  void airplay_receiver_start(void);
+  airplay_receiver_start();
 }
+
+- (void)applicationWillTerminate:(NSNotification *)notification{
+  NSLog(@"applicationWillTerminate");
+  void airplay_receiver_stop(void);
+  airplay_receiver_stop();
+}
+
 
 -(BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender{
 //  NSLog(@"wc: %lu", (unsigned long)[app windows].count);
@@ -136,4 +148,3 @@ int main(int argc, const char * argv[]) {
   [[[MyApplicationDelegate alloc] initWithApp:[NSApplication sharedApplication]] run];
   return 0;
 }
-
