@@ -10,6 +10,7 @@ Always on top window preview similar to the popular windows only OnTopReplica
 * CoreGraphics based capturer (looking for alternative)
 * No third party dependency
 * Uses private framework for native pip support
+* AirPlay backend from https://github.com/FDH2/UxPlay and https://github.com/KqSMea8/AirplayServer
 
 ## Features
 * Clone any visibile window
@@ -20,6 +21,7 @@ Always on top window preview similar to the popular windows only OnTopReplica
 * Native picture in picture support ```cmd+p```
 * Transparency/opacity control (slider in right click menu)
 * Minimal modern UI
+* Upto 10 parallel airplay sessions (soft limit)
 
 ## To do
 * Almost all the missing features when compared to [OnTopReplica](https://github.com/LorenzCK/OnTopReplica)
@@ -28,7 +30,7 @@ Always on top window preview similar to the popular windows only OnTopReplica
 
 ### Manual download
 
-[PiP-1.40.dmg](https://github.com/amitv87/PiP/releases/download/v1.40/PiP-1.40.dmg)
+[PiP-2.00.dmg](https://github.com/amitv87/PiP/releases/download/v2.00/PiP-2.00.dmg)
 
 ### Download and install via Homebrew
 
@@ -48,7 +50,7 @@ xcodebuild
 open build/Release/PiP.app
 
 # or simply
-./run.sh
+./run.sh (needs rework)
 
 # right click on the window and select an option from the list
 # right click again and select last option to crop the preview
