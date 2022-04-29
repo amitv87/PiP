@@ -806,9 +806,14 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   if(is_airplay_session) goto end;
   [theMenu addItem:[NSMenuItem separatorItem]];
 
+  bool should_exclude_desktop_elements = [(NSNumber*)getPref(@"wfilter_desktop_elemnts") intValue] > 0;
+  bool should_exclude_windows_with_null_title = [(NSNumber*)getPref(@"wfilter_null_title") intValue] > 0;
+  bool should_exclude_windows_with_empty_title = [(NSNumber*)getPref(@"wfilter_epmty_title") intValue] > 0;
+  bool should_exclude_floating_windows = [(NSNumber*)getPref(@"wfilter_floating") intValue] > 0;
+
   uint32_t windowId = 0;
   CGWindowListOption win_option = kCGWindowListOptionAll;
-  if([(NSNumber*)getPref(@"wfilter_desktop_elemnts") intValue] > 0) win_option |= kCGWindowListExcludeDesktopElements;
+  if(should_exclude_desktop_elements) win_option |= kCGWindowListExcludeDesktopElements;
   CFArrayRef all_windows = CGWindowListCopyWindowInfo(win_option, kCGNullWindowID);
 
   for (CFIndex i = 0; i < CFArrayGetCount(all_windows); ++i) {
@@ -816,14 +821,14 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
     int layer = -1;
     CFNumberGetValue((CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowLayer), kCFNumberIntType, &layer);
-    if(layer != 0) continue;
+    if(layer != 0 && should_exclude_floating_windows) continue;
 
     NSString* owner = (__bridge NSString*)CFDictionaryGetValue(window_ref, kCGWindowOwnerName);
     NSString* name = (__bridge NSString*)CFDictionaryGetValue(window_ref, kCGWindowName);
 //    NSLog(@"owner: %@, name: %@", owner, name);
     if(!owner) continue;
-    if(!name && [(NSNumber*)getPref(@"wfilter_null_title") intValue] > 0) continue;
-    if([name length] <= 0 && [(NSNumber*)getPref(@"wfilter_epmty_title") intValue] > 0) continue;
+    if(!name && should_exclude_windows_with_null_title) continue;
+    if([name length] <= 0 && should_exclude_windows_with_empty_title) continue;
 
     CFNumberRef id_ref = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowNumber);
     CFNumberGetValue(id_ref, kCFNumberIntType, &windowId);

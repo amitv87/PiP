@@ -25,8 +25,9 @@ static NSDictionary* getDefaultPrefs(void){
   return @{
     OPTION(renderer, "Display Renderer", Select, (@[@"Metal", @"Opengl"]), [NSNumber numberWithInt:DisplayRendererTypeOpenGL], [NSNull null]),
     OPTION(airplay, "AirPlay Receiver", CheckBox, [NSNull null], @1, @"Use PiP as Airplay receiver"),
-    OPTION(wfilter_null_title, "Exclude windows when", CheckBox, [NSNull null], @1, @"title is null"),
-    OPTION(wfilter_epmty_title, "Exclude windows when", CheckBox, [NSNull null], @1, @"title is empty"),
+    OPTION(wfilter_null_title, "Exclude windows", CheckBox, [NSNull null], @1, @"when title is null"),
+    OPTION(wfilter_epmty_title, "Exclude windows", CheckBox, [NSNull null], @1, @"when title is empty"),
+    OPTION(wfilter_floating, "Exclude windows", CheckBox, [NSNull null], @1, @"that are floating"),
     OPTION(wfilter_desktop_elemnts, "Exclude windows", CheckBox, [NSNull null], @1, @"that are desktop elements"),
   };
 }
@@ -92,13 +93,7 @@ static NSArray* getPrefsArray(void){
   tableView.delegate = self;
   tableView.dataSource = self;
   tableView.headerView = nil;
-//  scrollView.backgroundColor = [NSColor clearColor];
-//  scrollView.drawsBackground = false;
-//  tableView.backgroundColor = [NSColor clearColor];
   tableView.intercellSpacing = NSMakeSize(0,0);
-//  tableView.alignment = NSTextAlignmentCenter;
-//  tableView.headerView = nil;
-//  tableView.style = NSTableViewStyleFullWidth;
   tableView.translatesAutoresizingMaskIntoConstraints = NO;
   tableView.layer.borderWidth = 0;
 
@@ -113,7 +108,6 @@ static NSArray* getPrefsArray(void){
 
   rootView.translatesAutoresizingMaskIntoConstraints = false;
 //  [rootView addConstraint:[NSLayoutConstraint constraintWithItem:rootView attribute:NSLayoutAttributeWidth relatedBy:NSLayoutRelationEqual toItem:nil attribute:NSLayoutAttributeNotAnAttribute multiplier:1 constant:450]];
-
 
   [self setContentView:rootView];
 
