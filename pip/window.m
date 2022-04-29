@@ -926,7 +926,7 @@ end:
 }
 
 - (void)windowDidBecomeKey:(NSNotification *)notification{
-//  [[NSApplication sharedApplication] activateIgnoringOtherApps:YES];
+  [[NSApplication sharedApplication] activateIgnoringOtherApps:YES];
 }
 
 //- (void)dealloc{
