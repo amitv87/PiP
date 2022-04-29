@@ -5,9 +5,9 @@
 	<key>Icon file</key>
 	<string>AppIcon</string>
 	<key>CFBundleVersion</key>
-	<string>9</string>
+	<string>10</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.01</string>
+	<string>2.02</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

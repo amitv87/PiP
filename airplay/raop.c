@@ -387,6 +387,15 @@ conn_destroy(void *ptr) {
         conn->raop->callbacks.video_flush(conn->raop->callbacks.cls, &conn->conn);
     }
 
+    raop_device_info* devInfo = &conn->conn.devInfo;
+
+    if(devInfo->osName) free(devInfo->osName);
+    if(devInfo->osVersion) free(devInfo->osVersion);
+    if(devInfo->model) free(devInfo->model);
+    if(devInfo->name) free(devInfo->name);
+
+    memset(devInfo, 0, sizeof(raop_device_info));
+
     free(conn->local);
     free(conn->remote);
     pairing_session_destroy(conn->pairing);
