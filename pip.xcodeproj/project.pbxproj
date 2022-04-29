@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		55338C06281AA9C200AC997B /* preferences.m in Sources */ = {isa = PBXBuildFile; fileRef = 55338C05281AA9C200AC997B /* preferences.m */; };
 		5547F69228144C5F00E22975 /* raop_rtp_mirror.c in Sources */ = {isa = PBXBuildFile; fileRef = 5547F63628144C5E00E22975 /* raop_rtp_mirror.c */; };
 		5547F69328144C5F00E22975 /* threads.h in Headers */ = {isa = PBXBuildFile; fileRef = 5547F63728144C5E00E22975 /* threads.h */; };
 		5547F69428144C5F00E22975 /* httpd.c in Sources */ = {isa = PBXBuildFile; fileRef = 5547F63828144C5E00E22975 /* httpd.c */; };
@@ -135,6 +136,8 @@
 /* Begin PBXFileReference section */
 		551EB2A5243B49AB002C6D34 /* cgs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = cgs.h; sourceTree = "<group>"; };
 		552115841FDD120F00F90350 /* PiP.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PiP.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		55338C04281AA9C200AC997B /* preferences.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = preferences.h; sourceTree = "<group>"; };
+		55338C05281AA9C200AC997B /* preferences.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = preferences.m; sourceTree = "<group>"; };
 		5547F62D28144BEF00E22975 /* libairplay.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libairplay.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		5547F63628144C5E00E22975 /* raop_rtp_mirror.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = raop_rtp_mirror.c; sourceTree = "<group>"; };
 		5547F63728144C5E00E22975 /* threads.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = threads.h; sourceTree = "<group>"; };
@@ -507,6 +510,8 @@
 				5547F71D28144E8200E22975 /* receiver.m */,
 				55B3031C28170EFF00E54502 /* audioPlayer.h */,
 				55B3031D28170EFF00E54502 /* audioPlayer.m */,
+				55338C04281AA9C200AC997B /* preferences.h */,
+				55338C05281AA9C200AC997B /* preferences.m */,
 			);
 			path = pip;
 			sourceTree = "<group>";
@@ -678,6 +683,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				55338C06281AA9C200AC997B /* preferences.m in Sources */,
 				55E7C03C246D4AC000BE7DD9 /* metalRenderer.m in Sources */,
 				559059281FDD13810003B647 /* main.m in Sources */,
 				5547F71E28144E8200E22975 /* receiver.m in Sources */,

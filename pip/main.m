@@ -7,6 +7,7 @@
 //
 
 #import "window.h"
+#import "preferences.h"
 #import <AVFoundation/AVFoundation.h>
 
 extern int windowCount;
@@ -26,7 +27,6 @@ item.keyEquivalentModifierMask = mask; \
 
 #define ADD_SCALE_ITEM(scale) [self addScaleMenuItemWithTitle:@"Scale " STRINGIFY(scale) keyEquivalent:@ STRINGIFY(scale) mask:NO andScale:100 * scale toMenu:menu];
 #define ADD_SCALE_ITEM_INVERSE(scale) [self addScaleMenuItemWithTitle:@"Scale 1/" STRINGIFY(scale) keyEquivalent:@ STRINGIFY(scale) mask:YES andScale:100 / scale toMenu:menu];
-
 
 @interface MyApplicationDelegate : NSObject <NSApplicationDelegate> {
   NSApplication* app;
@@ -48,6 +48,8 @@ item.keyEquivalentModifierMask = mask; \
   INIT_MENU(appName);
   ADD_ITEM([@"About " stringByAppendingString:appName], orderFrontStandardAboutPanel:, @"");
   ADD_SEP();
+  ADD_ITEM(@"Preferences", showPreferencePanel:, @",");
+  ADD_SEP();
   ADD_ITEM([@"Hide " stringByAppendingString:appName], hideAll, @"h");
   ADD_ITEM([@"Quit " stringByAppendingString:appName], terminate:, @"q");
 
@@ -66,6 +68,7 @@ item.keyEquivalentModifierMask = mask; \
   ADD_SCALE_ITEM_INVERSE(4);
   ADD_SEP();
   ADD_ITEM_MASK(@"Zoom", performZoom:, @"z", NSEventModifierFlagCommand | NSEventModifierFlagOption);
+  ADD_ITEM(@"Fullscreen", toggleFullScreen:, @"f");
   ADD_ITEM(@"Minimize", performMiniaturize:, @"m");
 //  ADD_ITEM(@"Always on top", toggleFloat, @"a");
   ADD_ITEM(@"Join all spaces", togglePin, @"j");
@@ -126,19 +129,28 @@ item.keyEquivalentModifierMask = mask; \
   [app setActivationPolicy:NSApplicationActivationPolicyRegular];
   [app activateIgnoringOtherApps:YES];
   [self newWindow];
+//  [self showPreferencePanel:self];
+  #ifndef NO_AIRPLAY
   void airplay_receiver_start(void);
-  airplay_receiver_start();
+  if([(NSNumber*)getPref(@"airplay") intValue] > 0) airplay_receiver_start();
+  #endif
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification{
   NSLog(@"applicationWillTerminate");
+  #ifndef NO_AIRPLAY
   void airplay_receiver_stop(void);
   airplay_receiver_stop();
+  #endif
 }
 
+- (void)showPreferencePanel:(id)sender{
+  if(global_pref) return;
+  global_pref = [[Preferences alloc] init];
+  [global_pref makeKeyAndOrderFront:self];
+}
 
 -(BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender{
-//  NSLog(@"wc: %lu", (unsigned long)[app windows].count);
   return false;
 }
 

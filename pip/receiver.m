@@ -115,7 +115,7 @@ void airplay_receiver_session_stop(raop_connection_t* conn){
 static void conn_init(void *cls, raop_connection_t* conn) {
   open_connections += 1;
   LOGI("conn_init open connections: %i", open_connections);
-  dispatch_async(dispatch_get_main_queue(), ^{airplay_receiver_session_start(conn);});
+  dispatch_sync(dispatch_get_main_queue(), ^{airplay_receiver_session_start(conn);});
 }
 
 static void conn_destroy(void *cls, raop_connection_t* conn) {
@@ -256,6 +256,7 @@ void airplay_receiver_stop(void){
 }
 
 void airplay_receiver_start(void){
+  airplay_receiver_stop();
   raop_callbacks_t raop_cbs = {
     .conn_init = conn_init,
     .conn_destroy = conn_destroy,
@@ -293,11 +294,13 @@ void airplay_receiver_start(void){
 
   raop_set_log_callback(raop, log_callback, NULL);
   raop_set_log_level(raop, DEFAULT_DEBUG_LOG ? RAOP_LOG_DEBUG : LOGGER_INFO);
-  raop_set_log_level(raop, RAOP_LOG_ERR);
+//  raop_set_log_level(raop, RAOP_LOG_DEBUG);
 
   unsigned short port = raop_get_port(raop);
   raop_start(raop, &port);
   raop_set_port(raop, port);
+  
+  NSLog(@"raop listening on %u", port);
 
   int error;
   uint8_t hw_addr[] = {0xa,0xb,0x0,0x0,0xb,0xa};

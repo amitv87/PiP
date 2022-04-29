@@ -11,7 +11,9 @@
 
 #import "pip.h"
 #import "imageView.h"
+#import "preferences.h"
 #import "selectionView.h"
+
 @class VButton;
 
 @protocol ButtonDelegate <NSObject>

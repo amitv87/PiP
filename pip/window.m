@@ -356,7 +356,6 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   bool shouldEnableFullScreen;
 }
 
-//- (id) init{
 - (id) initWithAirplay:(bool)enable andTitle:(NSString*)title{
   pvc = nil;
   timer = NULL;
@@ -368,8 +367,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   
   airplay_title = title;
 
-  shouldEnableFullScreen = true;
-  is_playing = is_airplay_session = enable;
+  shouldEnableFullScreen = is_playing = is_airplay_session = enable;
 
   self = [super initWithContentRect:kStartRect styleMask:kWindowMask backing:NSBackingStoreBuffered defer:YES];
 
@@ -431,8 +429,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   rootView.autoresizingMask = NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin;
 
   imageView = [[ImageView alloc] initWithFrame:kStartRect];
-//  imageView.renderer = [[MetalRenderer alloc] init];
-  imageView.renderer = [[OpenGLRenderer alloc] init];
+  imageView.renderer = [(NSNumber*)getPref(@"renderer") intValue] == DisplayRendererTypeOpenGL ? [[OpenGLRenderer alloc] init] : [[MetalRenderer alloc] init];
   imageView.renderer.delegate = self;
   imageView.hidden = !is_airplay_session;
 
@@ -751,6 +748,17 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 }
 
 - (void)rightMouseDown:(NSEvent *)theEvent {
+  if(@available(macOS 11.0, *)) {
+    if(!CGPreflightScreenCaptureAccess()){
+      NSAlert *alert = [[NSAlert alloc] init];
+      [alert setMessageText:@"Missing screen recording permission, please do the needful to proceed"];
+      [alert addButtonWithTitle:@"Ok"];
+      [alert runModal];
+      CGRequestScreenCaptureAccess();
+      return;
+    }
+  }
+
   NSMenu *theMenu = [[NSMenu alloc] init];
   [theMenu setMinimumWidth:100];
   NSMenuItem* item = [theMenu addItemWithTitle:[NSString stringWithFormat:@"%snative pip", (pvc ? "exit " : "") ] action:@selector(toggleNativePip) keyEquivalent:@""];
@@ -799,7 +807,9 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   [theMenu addItem:[NSMenuItem separatorItem]];
 
   uint32_t windowId = 0;
-  CFArrayRef all_windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
+  CGWindowListOption win_option = kCGWindowListOptionAll;
+  if([(NSNumber*)getPref(@"wfilter_desktop_elemnts") intValue] > 0) win_option |= kCGWindowListExcludeDesktopElements;
+  CFArrayRef all_windows = CGWindowListCopyWindowInfo(win_option, kCGNullWindowID);
 
   for (CFIndex i = 0; i < CFArrayGetCount(all_windows); ++i) {
     CFDictionaryRef window_ref = (CFDictionaryRef)CFArrayGetValueAtIndex(all_windows, i);
@@ -807,6 +817,13 @@ static CGImageRef CaptureWindow(CGWindowID wid){
     int layer = -1;
     CFNumberGetValue((CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowLayer), kCFNumberIntType, &layer);
     if(layer != 0) continue;
+
+    NSString* owner = (__bridge NSString*)CFDictionaryGetValue(window_ref, kCGWindowOwnerName);
+    NSString* name = (__bridge NSString*)CFDictionaryGetValue(window_ref, kCGWindowName);
+//    NSLog(@"owner: %@, name: %@", owner, name);
+    if(!owner) continue;
+    if(!name && [(NSNumber*)getPref(@"wfilter_null_title") intValue] > 0) continue;
+    if([name length] <= 0 && [(NSNumber*)getPref(@"wfilter_epmty_title") intValue] > 0) continue;
 
     CFNumberRef id_ref = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowNumber);
     CFNumberGetValue(id_ref, kCFNumberIntType, &windowId);
@@ -816,7 +833,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
     if(bounds){
       NSRect rect = NSZeroRect;
       CGRectMakeWithDictionaryRepresentation(bounds, &rect);
-      isFaulty = rect.size.width <= 1 && rect.size.height <= 1;
+      isFaulty = rect.size.width * rect.size.height <= 1;
       if(!isFaulty){
         CFArrayRef spaces = CGSCopySpacesForWindows(CGSMainConnectionID(), kCGSAllSpacesMask, (__bridge CFArrayRef)@[[NSNumber numberWithInt:windowId]]);
         if(spaces){
@@ -829,26 +846,22 @@ static CGImageRef CaptureWindow(CGWindowID wid){
     else{
       CGImageRef window_image = CaptureWindow(windowId);
       if(window_image == NULL) continue;
-      isFaulty = CGImageGetHeight(window_image) == 1 && CGImageGetWidth(window_image) == 1;
+      isFaulty = CGImageGetHeight(window_image) * CGImageGetWidth(window_image) <= 1;
       CGImageRelease(window_image);
     }
 
     if(isFaulty) continue;
 
-    CFStringRef name_ref = (CFStringRef)CFDictionaryGetValue(window_ref, kCGWindowName);
-
 //    NSLog(@"%@", (__bridge NSDictionary*)window_ref);
 
-    CFStringRef owner_ref = (CFStringRef)CFDictionaryGetValue(window_ref, kCGWindowOwnerName);
-
-    NSString* windowTitle = [[(__bridge NSString*)owner_ref stringByAppendingString:@" - "] stringByAppendingString: name_ref ? (__bridge NSString*)name_ref : @""];
+    NSString* windowTitle = [NSString stringWithFormat:@"%@ - %@", owner, name];
 
     NSMenuItem* item = [theMenu addItemWithTitle:windowTitle action:@selector(changeWindow:) keyEquivalent:@""];
     [item setTarget:self];
 
     WindowSel* sel = [[WindowSel alloc] init];
-    sel.owner = (__bridge NSString*)owner_ref;
-    sel.title = (__bridge NSString*)name_ref;
+    sel.owner = owner;
+    sel.title = name;
     sel.winId = windowId;
     [item setRepresentedObject:sel];
   }
@@ -908,7 +921,7 @@ end:
 }
 
 - (void)windowDidBecomeKey:(NSNotification *)notification{
-  [[NSApplication sharedApplication] activateIgnoringOtherApps:YES];
+//  [[NSApplication sharedApplication] activateIgnoringOtherApps:YES];
 }
 
 //- (void)dealloc{
@@ -965,8 +978,10 @@ end:
 
   [self setContentViewController:nil];
 
+  #ifndef NO_AIRPLAY
   void airplay_receiver_session_stop(void* conn);
   if(is_airplay_session) airplay_receiver_session_stop(self.conn);
+  #endif
 
   if(audPlayer) [audPlayer destroy]; audPlayer = nil;
   if(h264decoder) [h264decoder destroy]; h264decoder = nil;
