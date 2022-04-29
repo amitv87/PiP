@@ -1,4 +1,4 @@
-# Mac OS X Picture in Picture
+# macOS Picture in Picture
 
 Always on top window preview similar to the popular windows only OnTopReplica
 
