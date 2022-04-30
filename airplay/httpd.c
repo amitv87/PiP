@@ -181,6 +181,20 @@ httpd_remove_connection(httpd_t *httpd, http_connection_t *connection)
     httpd->open_connections--;
 }
 
+static void
+close_server_fds(httpd_t *httpd){
+    if (httpd->server_fd4 != -1) {
+        shutdown(httpd->server_fd4, SHUT_RDWR);
+        closesocket(httpd->server_fd4);
+        httpd->server_fd4 = -1;
+    }
+    if (httpd->server_fd6 != -1) {
+        shutdown(httpd->server_fd6, SHUT_RDWR);
+        closesocket(httpd->server_fd6);
+        httpd->server_fd6 = -1;
+    }
+}
+
 static THREAD_RETVAL
 httpd_thread(void *arg)
 {
@@ -350,16 +364,7 @@ httpd_thread(void *arg)
     }
 
     /* Close server sockets since they are not used any more */
-    if (httpd->server_fd4 != -1) {
-        shutdown(httpd->server_fd4, SHUT_RDWR);
-        closesocket(httpd->server_fd4);
-        httpd->server_fd4 = -1;
-    }
-    if (httpd->server_fd6 != -1) {
-        shutdown(httpd->server_fd6, SHUT_RDWR);
-        closesocket(httpd->server_fd6);
-        httpd->server_fd6 = -1;
-    }
+    close_server_fds(httpd);
 
     // Ensure running reflects the actual state
     MUTEX_LOCK(httpd->run_mutex);
@@ -447,6 +452,7 @@ httpd_stop(httpd_t *httpd)
         MUTEX_UNLOCK(httpd->run_mutex);
         return;
     }
+    close_server_fds(httpd);
     httpd->running = 0;
     MUTEX_UNLOCK(httpd->run_mutex);
 

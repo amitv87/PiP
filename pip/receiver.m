@@ -26,30 +26,9 @@
 
 #define MAX_ACTIVE_SESSIONS 10
 
-#define DEFAULT_DEBUG_LOG false
 #define LOWEST_ALLOWED_PORT 1024
 #define HIGHEST_PORT 65535
 #define NTP_TIMEOUT_LIMIT 5
-
-#define LEVEL_ERROR 0
-#define LEVEL_WARN 1
-#define LEVEL_INFO 2
-#define LEVEL_DEBUG 3
-#define LEVEL_VERBOSE 4
-
-void __log(int level, const char* format, ...) {
-  va_list vargs;
-  va_start(vargs, format);
-  vprintf(format, vargs);
-  printf("\r\n");
-  va_end(vargs);
-}
-
-#define LOGV(...) __log(LEVEL_VERBOSE, __VA_ARGS__)
-#define LOGD(...) __log(LEVEL_DEBUG, __VA_ARGS__)
-#define LOGI(...) __log(LEVEL_INFO, __VA_ARGS__)
-#define LOGW(...) __log(LEVEL_WARN, __VA_ARGS__)
-#define LOGE(...) __log(LEVEL_ERROR, __VA_ARGS__)
 
 #include <net/if.h>
 #include <net/ethernet.h>
@@ -114,24 +93,24 @@ void airplay_receiver_session_stop(raop_connection_t* conn){
 
 static void conn_init(void *cls, raop_connection_t* conn) {
   open_connections += 1;
-  LOGI("conn_init open connections: %i", open_connections);
+  NSLog(@"conn_init open connections: %i", open_connections);
   dispatch_sync(dispatch_get_main_queue(), ^{airplay_receiver_session_start(conn);});
 }
 
 static void conn_destroy(void *cls, raop_connection_t* conn) {
   open_connections -= 1;
-  LOGI("conn_destroy open connections: %i", open_connections);
+  NSLog(@"conn_destroy open connections: %i", open_connections);
   Window* window = (__bridge Window *)(conn->usr_data);
   conn->usr_data = window.conn = NULL;
   dispatch_async(dispatch_get_main_queue(), ^{[window performClose:window];});
 }
 
 static void conn_reset(void *cls, int timeouts, bool reset_video, raop_connection_t* conn) {
-  LOGI("conn_reset cls: %p, timeouts: %d, reset_video: %u", cls, timeouts, reset_video);
+  NSLog(@"conn_reset cls: %p, timeouts: %d, reset_video: %u", cls, timeouts, reset_video);
 }
 
 static void conn_teardown(void *cls, bool *teardown_96, bool *teardown_110, raop_connection_t* conn){
-  LOGI("conn_teardown cls: %p, teardown_96: %u, teardown_110: %u", cls, teardown_96, *teardown_110);
+  NSLog(@"conn_teardown cls: %p, teardown_96: %u, teardown_110: %u", cls, teardown_96, *teardown_110);
 }
 
 static void audio_process (void *cls, raop_ntp_t *ntp, aac_decode_struct *data, raop_connection_t* conn){
@@ -166,11 +145,11 @@ static void video_process(void *cls, raop_ntp_t *ntp, h264_decode_struct *data, 
 }
 
 static void audio_flush (void *cls, raop_connection_t* conn){
-  LOGI("audio_flush cls: %p", cls);
+  NSLog(@"audio_flush cls: %p", cls);
 }
 
 static void video_flush (void *cls, raop_connection_t* conn){
-  LOGI("video_flush cls: %p", cls);
+  NSLog(@"video_flush cls: %p", cls);
 }
 
 static void audio_set_volume (void *cls, float volume_db, raop_connection_t* conn){
@@ -185,23 +164,23 @@ static void audio_set_volume (void *cls, float volume_db, raop_connection_t* con
 }
 
 static void audio_set_metadata(void *cls, const void *buffer, int buflen, raop_connection_t* conn){
-  LOGI("audio_set_metadata len: %.*s", buflen, buffer);
+  NSLog(@"audio_set_metadata len: %.*s", buflen, buffer);
 }
 
 static void audio_set_coverart(void *cls, const void *buffer, int buflen, raop_connection_t* conn){
-  LOGI("audio_set_coverart: %.*s", buflen, buffer);
+  NSLog(@"audio_set_coverart: %.*s", buflen, buffer);
 }
 
 static void audio_remote_control_id(void *cls, const char *dacp_id, const char *active_remote_header, raop_connection_t* conn){
-  LOGI("audio_remote_control_id dacp_id: %s, active_remote_header: %s", dacp_id, active_remote_header);
+  NSLog(@"audio_remote_control_id dacp_id: %s, active_remote_header: %s", dacp_id, active_remote_header);
 }
 
 static void audio_set_progress(void *cls, unsigned int start, unsigned int curr, unsigned int end, raop_connection_t* conn){
-  LOGI("audio_set_progress start: %u, curr: %u, end: %u", start, curr, end);
+  NSLog(@"audio_set_progress start: %u, curr: %u, end: %u", start, curr, end);
 }
 
 static void audio_get_format(void *cls, audio_format_info* info, raop_connection_t* conn){
-  LOGI("ct=%d spf=%d usingScreen=%d isMedia=%d  audioFormat=0x%lx", info->ct, info->spf, info->usingScreen, info->isMedia, info->audioFormat);
+  NSLog(@"ct=%d spf=%d usingScreen=%d isMedia=%d  audioFormat=0x%lx", info->ct, info->spf, info->usingScreen, info->isMedia, info->audioFormat);
   if(!conn->usr_data) return;
   UInt32 format;
   switch(info->ct){
@@ -215,31 +194,12 @@ static void audio_get_format(void *cls, audio_format_info* info, raop_connection
 }
 
 static void video_report_size(void *cls, float *width_source, float *height_source, float *width, float *height, raop_connection_t* conn){
-  LOGI("video_report_size cls: %p, width_source: %f, height_source: %f, width: %f, height: %f",
+  NSLog(@"video_report_size cls: %p, width_source: %f, height_source: %f, width: %f, height: %f",
        cls, *width_source, *height_source, *width, *height);
 }
 
 static void log_callback (void *cls, int level, const char *msg) {
-  switch (level) {
-    case LOGGER_DEBUG: {
-      LOGD("%s", msg);
-      break;
-    }
-    case LOGGER_WARNING: {
-      LOGW("%s", msg);
-      break;
-    }
-    case LOGGER_INFO: {
-      LOGI("%s", msg);
-      break;
-    }
-    case LOGGER_ERR: {
-      LOGE("%s", msg);
-      break;
-    }
-    default:
-    break;
-  }
+  NSLog(@"%s", msg);
 }
 
 void airplay_receiver_stop(void){
@@ -293,8 +253,8 @@ void airplay_receiver_start(void){
   raop_set_udp_ports(raop, ports);
 
   raop_set_log_callback(raop, log_callback, NULL);
-  raop_set_log_level(raop, DEFAULT_DEBUG_LOG ? RAOP_LOG_DEBUG : LOGGER_INFO);
-//  raop_set_log_level(raop, RAOP_LOG_DEBUG);
+  raop_set_log_level(raop, LOGGER_INFO);
+  raop_set_log_level(raop, RAOP_LOG_DEBUG);
 
   unsigned short port = raop_get_port(raop);
   raop_start(raop, &port);
@@ -305,7 +265,7 @@ void airplay_receiver_start(void){
   int error;
   uint8_t hw_addr[] = {0xa,0xb,0x0,0x0,0xb,0xa};
   get_mac(hw_addr);
-//  printf("hw_addr: %02x:%02x:%02x:%02x:%02x:%02x\n", hw_addr[0], hw_addr[1], hw_addr[2], hw_addr[3], hw_addr[4], hw_addr[5]);
+  NSLog(@"hw_addr: %02x:%02x:%02x:%02x:%02x:%02x", hw_addr[0], hw_addr[1], hw_addr[2], hw_addr[3], hw_addr[4], hw_addr[5]);
 
   char server_name[64] = {0};
   int rc = snprintf(server_name, sizeof(server_name) - 1, "%s", "PiP");
@@ -314,7 +274,7 @@ void airplay_receiver_start(void){
   if(uname(&buf) == 0) rc += snprintf(server_name + rc, sizeof(server_name) - 1 - rc, "@%s", buf.nodename);
   dnssd = dnssd_init(server_name, rc, (char*)hw_addr, sizeof(hw_addr), &error);
   if(error){
-    LOGE("Could not initialize dnssd library, error: %d", error);
+    NSLog(@"Could not initialize dnssd library, error: %d", error);
     airplay_receiver_stop();
     return;
   }

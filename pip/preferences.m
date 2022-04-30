@@ -24,7 +24,9 @@ typedef enum{
 static NSDictionary* getDefaultPrefs(void){
   return @{
     OPTION(renderer, "Display Renderer", Select, (@[@"Metal", @"Opengl"]), [NSNumber numberWithInt:DisplayRendererTypeOpenGL], [NSNull null]),
+    #ifndef NO_AIRPLAY
     OPTION(airplay, "AirPlay Receiver", CheckBox, [NSNull null], @1, @"Use PiP as Airplay receiver"),
+    #endif
     OPTION(wfilter_null_title, "Exclude windows", CheckBox, [NSNull null], @1, @"when title is null"),
     OPTION(wfilter_epmty_title, "Exclude windows", CheckBox, [NSNull null], @1, @"when title is empty"),
     OPTION(wfilter_floating, "Exclude windows", CheckBox, [NSNull null], @1, @"that are floating"),
