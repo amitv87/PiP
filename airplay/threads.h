@@ -46,6 +46,7 @@ typedef pthread_t thread_handle_t;
 #define THREAD_RETVAL void *
 #define THREAD_CREATE(handle, func, arg) \
 	if (pthread_create(&(handle), NULL, func, arg)) handle = 0
+#define THREAD_CANCEL(handle) pthread_cancel(handle)
 #define THREAD_JOIN(handle) pthread_join(handle, NULL)
 
 typedef pthread_mutex_t mutex_handle_t;

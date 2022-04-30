@@ -984,7 +984,6 @@ end:
   [self setContentViewController:nil];
 
   #ifndef NO_AIRPLAY
-  void airplay_receiver_session_stop(void* conn);
   if(is_airplay_session) airplay_receiver_session_stop(self.conn);
   #endif
 

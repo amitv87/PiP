@@ -270,6 +270,7 @@
 		55E7C03A246D4A4800BE7DD9 /* imageRenderer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = imageRenderer.h; sourceTree = "<group>"; };
 		55E7C03B246D4AC000BE7DD9 /* metalRenderer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = metalRenderer.m; sourceTree = "<group>"; };
 		55E7C03D246D4E6900BE7DD9 /* openGLRenderer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = openGLRenderer.m; sourceTree = "<group>"; };
+		55F0590E281D407F00C0A809 /* receiver.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = receiver.h; sourceTree = "<group>"; };
 		55FEB91F2115EA9A00D8350C /* PIP.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = PIP.framework; path = /System/Library/PrivateFrameworks/PIP.framework; sourceTree = "<group>"; };
 		55FEB9212115ECCC00D8350C /* pip.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = pip.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -507,6 +508,7 @@
 				55E7C03A246D4A4800BE7DD9 /* imageRenderer.h */,
 				55E7C03B246D4AC000BE7DD9 /* metalRenderer.m */,
 				55E7C03D246D4E6900BE7DD9 /* openGLRenderer.m */,
+				55F0590E281D407F00C0A809 /* receiver.h */,
 				5547F71D28144E8200E22975 /* receiver.m */,
 				55B3031C28170EFF00E54502 /* audioPlayer.h */,
 				55B3031D28170EFF00E54502 /* audioPlayer.m */,

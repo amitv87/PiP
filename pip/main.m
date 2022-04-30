@@ -131,7 +131,6 @@ item.keyEquivalentModifierMask = mask; \
   [self newWindow];
 //  [self showPreferencePanel:self];
   #ifndef NO_AIRPLAY
-  void airplay_receiver_start(void);
   if([(NSNumber*)getPref(@"airplay") intValue] > 0) airplay_receiver_start();
   #endif
 }
@@ -139,7 +138,6 @@ item.keyEquivalentModifierMask = mask; \
 - (void)applicationWillTerminate:(NSNotification *)notification{
   NSLog(@"applicationWillTerminate");
   #ifndef NO_AIRPLAY
-  void airplay_receiver_stop(void);
   airplay_receiver_stop();
   #endif
 }

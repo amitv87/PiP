@@ -10,6 +10,7 @@
 #define Window_h
 
 #import "pip.h"
+#import "receiver.h"
 #import "imageView.h"
 #import "preferences.h"
 #import "selectionView.h"

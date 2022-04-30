@@ -5,12 +5,11 @@
 //  Created by Amit Verma on 23/04/22.
 //  Copyright © 2022 boggyb. All rights reserved.
 //
-
+#ifndef NO_AIRPLAY
 
 #include <stdio.h>
 #include <stdarg.h>
 
-#include "raop.h"
 #include "stream.h"
 #include "logger.h"
 #include "dnssd.h"
@@ -283,3 +282,5 @@ void airplay_receiver_start(void){
   dnssd_register_raop(dnssd, port);
   dnssd_register_airplay(dnssd, port != HIGHEST_PORT ? port + 1 : port - 1);
 }
+
+#endif
