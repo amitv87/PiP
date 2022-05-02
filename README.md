@@ -52,7 +52,7 @@ xcodebuild
 open build/Release/PiP.app
 
 # or simply
-./run.sh (needs rework)
+./run.sh
 
 # right click on the window and select an option from the list
 # right click again and select last option to crop the preview
