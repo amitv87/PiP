@@ -7,13 +7,21 @@
 //
 
 #import "cgs.h"
-#import "img.h"
 #import "common.h"
 #import "window.h"
 #import "audioPlayer.h"
 #import "H264Decoder.h"
 
-#define GET_IMG(x) [[NSImage alloc] initWithData:[NSData dataWithBytes:img_##x##_png length:img_##x##_png_len]]
+#define INCBIN_SILENCE_BITCODE_WARNING
+#include "incbin.h"
+#define INC_IMG(x) INCBIN(img_##x##_, "img/" #x ".png")
+#define GET_IMG(x) [[NSImage alloc] initWithData:[NSData dataWithBytes:gimg_##x##_Data length:gimg_##x##_Size]]
+
+INC_IMG(pin);
+INC_IMG(pop);
+INC_IMG(play);
+INC_IMG(pause);
+INC_IMG(pinned);
 
 static CGRect kStartRect = {
   .origin = {.x = 0, .y = 0,},
@@ -350,6 +358,9 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   AudioPlayer* audPlayer;
   H264Decoder* h264decoder;
 
+  NSTimer* mouse_timer;
+  bool mouse_timer_rerun;
+
   NSString* airplay_title;
   bool is_playing;
   bool is_airplay_session;
@@ -447,6 +458,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   [[butCont.centerXAnchor constraintEqualToAnchor:rootView.centerXAnchor constant:-butContRect.origin.x] setActive:true];
 
   NSTrackingAreaOptions nstopts = NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways | NSTrackingInVisibleRect | NSTrackingAssumeInside;
+  nstopts |= NSTrackingMouseMoved;
   NSTrackingArea *nstArea = [[NSTrackingArea alloc] initWithRect:[[self contentView] frame] options:nstopts owner:self userInfo:nil];
 
   [rootView addTrackingArea:nstArea];
@@ -483,17 +495,43 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   else if(button == pinbutt) [self togglePin];
 }
 
+- (void)stopMouseTimer{
+  if(!mouse_timer) return;
+  [mouse_timer invalidate];
+  mouse_timer = nil;
+}
+
+- (void)mouseMoved:(NSEvent *)event{
+  if(pvc) return;
+  if(!mouse_timer)[[butCont animator] setAlphaValue:1];
+  else{
+    mouse_timer_rerun = true;
+    return;
+  }
+
+  mouse_timer = [NSTimer timerWithTimeInterval:1 repeats:NO block:^(NSTimer * _Nonnull timer){
+    [self stopMouseTimer];
+    if(self->mouse_timer_rerun){
+      self->mouse_timer_rerun = false;
+      [self mouseMoved:event];
+    }
+    else [[self->butCont animator] setAlphaValue:0];
+  }];
+  [[NSRunLoop mainRunLoop] addTimer:mouse_timer forMode:NSRunLoopCommonModes];
+}
+
 - (void)mouseEntered:(NSEvent *)event{
   [self onMouseEnter:true];
 }
 
 - (void)mouseExited:(NSEvent *)event{
+  [self stopMouseTimer];
   [self onMouseEnter:false];
 }
 
 - (void)onMouseEnter:(BOOL)value{
+  if([self isFullScreen]) return;
   bool alphaVal = value;
-  if([self isFullScreen]) alphaVal = true;
   if(pvc) alphaVal = false;
   if(self.ignoresMouseEvents) alphaVal = false;
   [[pinbutt animator] setAlphaValue:alphaVal];
@@ -560,6 +598,16 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   [self resetWindow:false];
 }
 
+- (void)windowDidEnterFullScreen:(NSNotification *)notification{
+  NSLog(@"windowDidEnterFullScreen");
+  pinbutt.hidden = true;
+}
+
+- (void)windowDidExitFullScreen:(NSNotification *)notification{
+  NSLog(@"windowDidExitFullScreen");
+  pinbutt.hidden = false;
+}
+
 - (void)togglePlayback{
   if(isWinClosing) return;
   if(is_airplay_session){
@@ -589,6 +637,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
 - (void) startPiP{
 //  NSLog(@"startPiP");
+  [self stopMouseTimer];
   pvc = [[PIPViewController alloc] init];
   [pvc setDelegate:self];
   [pvc setUserCanResize:true];
@@ -692,13 +741,14 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 }
 
 - (void) renderAudio:(uint8_t*) data withLength:(size_t) length{
-  if(!self->is_playing) return;
+  if(!is_playing || isWinClosing) return;
   [audPlayer decode:data andLength:length];
 }
 
 - (void) renderH264:(uint8_t*) data withLength:(size_t) length{
+  if(!is_playing || isWinClosing) return;
   [h264decoder decode:data withLength:length andReturnDecodedData:^(CVPixelBufferRef pixelBuffer){
-    if(!self->is_playing) return;
+    if(!self->is_playing || self->isWinClosing) return;
     CIImage* image = [CIImage imageWithCVPixelBuffer:pixelBuffer];
     dispatch_async(dispatch_get_main_queue(), ^{[self->imageView setImage:image];});
   }];
@@ -951,8 +1001,14 @@ end:
     return;
   }
 
+  [self stopMouseTimer];
+
   if(isWinClosing) return;
   isWinClosing = true;
+
+  #ifndef NO_AIRPLAY
+  if(is_airplay_session) airplay_receiver_session_stop(self.conn);
+  #endif
 
   [self stopTimer];
 
@@ -982,10 +1038,6 @@ end:
   selectionView = NULL;
 
   [self setContentViewController:nil];
-
-  #ifndef NO_AIRPLAY
-  if(is_airplay_session) airplay_receiver_session_stop(self.conn);
-  #endif
 
   if(audPlayer) [audPlayer destroy]; audPlayer = nil;
   if(h264decoder) [h264decoder destroy]; h264decoder = nil;
