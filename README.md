@@ -48,7 +48,7 @@ git clone https://github.com/amitv87/PiP.git
 cd pip
 
 # build using xcode
-xcodebuild
+xcodebuild -alltargets
 open build/Release/PiP.app
 
 # or simply

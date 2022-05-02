@@ -663,8 +663,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				552115831FDD120F00F90350 /* PiP */,
 				5547F62C28144BEF00E22975 /* airplay */,
+				552115831FDD120F00F90350 /* PiP */,
 			);
 		};
 /* End PBXProject section */
