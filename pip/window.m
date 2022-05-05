@@ -181,6 +181,7 @@ static void bringWindoToForeground(CGWindowID wid){
 }
 
 static CGImageRef CaptureWindow(CGWindowID wid){
+  if(!wid) return CGDisplayCreateImage(kCGDirectMainDisplay);
   CGImageRef window_image = NULL;
   CFArrayRef window_image_arr = NULL;
   window_image_arr = CGSHWCaptureWindowList(CGSMainConnectionID(), &wid, 1, kCGSCaptureIgnoreGlobalClipShape | kCGSWindowCaptureNominalResolution);
@@ -347,7 +348,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   bool shouldClose;
   bool isWinClosing;
   bool isPipCLosing;
-  CGWindowID window_id;
+  int window_id;
   RootView* rootView;
   NSViewController* nvc;
   PIPViewController* pvc;
@@ -370,7 +371,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 - (id) initWithAirplay:(bool)enable andTitle:(NSString*)title{
   pvc = nil;
   timer = NULL;
-  window_id = 0;
+  window_id = -1;
   refreshRate = 30;
   shouldClose = false;
   isWinClosing = false;
@@ -473,7 +474,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   }
 
 //  [self onMouseEnter:false];
-  [self setOnwer:@"PiP" withTitle:is_airplay_session ? airplay_title : @"(right click to begin)"];
+  [self setOwner:@"PiP" withTitle:is_airplay_session ? airplay_title : @"(right click to begin)"];
 
   [self resetPlaybackSate];
 
@@ -484,9 +485,8 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   return YES;
 }
 
-- (void)setOnwer:(NSString*)owner withTitle:(NSString*) title{
-  if(window_id) [self setTitle:@""];
-  else [self setTitle:[NSString localizedStringWithFormat:@"%@ - %@", owner, title]];
+- (void)setOwner:(NSString*)owner withTitle:(NSString*) title{
+  [self setTitle:[NSString localizedStringWithFormat:@"%@ - %@", owner, title]];
 }
 
 - (void) onClick:(VButton*)button{
@@ -711,14 +711,14 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 - (void)startTimer:(double)interval{
 //  NSLog(@"startTimer %f", interval);
   [self stopTimer];
-  if(window_id == 0) return;
+  if(window_id < 0) return;
   timer = [NSTimer timerWithTimeInterval:interval target:self selector:@selector(capture) userInfo:nil repeats:YES];
   [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
   [self resetPlaybackSate];
 }
 
 - (void)onResize:(CGSize)size andAspectRatio:(CGSize) ar{
-  if(window_id == 0 && !is_airplay_session) return;
+  if(window_id < 0 && !is_airplay_session) return;
   [self setAspectRatio:ar];
   if(pvc) [pvc setAspectRatio:ar];
   else{
@@ -788,7 +788,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   WindowSel* sel = [[WindowSel alloc] init];
   sel.owner = @"PiP";
   sel.title = @"(right click to begin)";
-  sel.winId = 0;
+  sel.winId = -1;
   [item setRepresentedObject:sel];
   [self changeWindow:item];
 }
@@ -814,7 +814,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   NSMenuItem* item = [theMenu addItemWithTitle:[NSString stringWithFormat:@"%snative pip", (pvc ? "exit " : "") ] action:@selector(toggleNativePip) keyEquivalent:@""];
   [item setTarget:self];
 
-  if(!pvc && (window_id != 0 || is_airplay_session)){
+  if(!pvc && (window_id >= 0 || is_airplay_session)){
     NSSize cropSize = [imageView.renderer cropRect].size;
     if(cropSize.width * cropSize.height == 0){
       NSMenuItem* item = [theMenu addItemWithTitle:@"select region" action:@selector(selectRegion:) keyEquivalent:@""];
@@ -826,13 +826,13 @@ static CGImageRef CaptureWindow(CGWindowID wid){
     }
   }
 
-  if(window_id != 0 && !is_airplay_session){
+  if(window_id >= 0 && !is_airplay_session){
     NSMenuItem* item = [theMenu addItemWithTitle:@"clear window" action:@selector(changeWindow:) keyEquivalent:@""];
     [item setTarget:self];
     WindowSel* sel = [[WindowSel alloc] init];
     sel.owner = @"PiP";
     sel.title = @"(right click to begin)";
-    sel.winId = 0;
+    sel.winId = -1;
     [item setRepresentedObject:sel];
   }
 
@@ -860,6 +860,19 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   bool should_exclude_windows_with_null_title = [(NSNumber*)getPref(@"wfilter_null_title") intValue] > 0;
   bool should_exclude_windows_with_empty_title = [(NSNumber*)getPref(@"wfilter_epmty_title") intValue] > 0;
   bool should_exclude_floating_windows = [(NSNumber*)getPref(@"wfilter_floating") intValue] > 0;
+
+  {
+    NSString* windowTitle = [NSString stringWithFormat:@"Main Display"];
+
+    NSMenuItem* item = [theMenu addItemWithTitle:windowTitle action:@selector(changeWindow:) keyEquivalent:@""];
+    [item setTarget:self];
+
+    WindowSel* sel = [[WindowSel alloc] init];
+    sel.owner = @"PiP";
+    sel.title = windowTitle;
+    sel.winId = 0;
+    [item setRepresentedObject:sel];
+  }
 
   uint32_t windowId = 0;
   CGWindowListOption win_option = kCGWindowListOptionAll;
@@ -937,10 +950,9 @@ end:
 }
 
 - (void)changeWindow:(id)sender{
-//  NSLog(@"changeWindow");
   WindowSel* sel = [sender representedObject];
 
-  if(!sel.winId){
+  if(sel.winId >= 0){
     NSSize size = [self frame].size;
     size.height = size.width;
     [self onResize:size andAspectRatio:kStartRect.size];
@@ -954,8 +966,8 @@ end:
   dispatch_async(dispatch_get_main_queue(), ^{[[NSCursor arrowCursor] set];});
 
   [imageView setImage:nil];
-  [imageView setHidden:window_id == 0];
-  [self setOnwer:sel.owner withTitle:sel.title];
+  [imageView setHidden:window_id < 0];
+  [self setOwner:sel.owner withTitle:sel.title];
 }
 
 - (void)selectRegion:(id)sender{
@@ -1012,7 +1024,7 @@ end:
 
   [self stopTimer];
 
-  window_id = 0;
+  window_id = -1;
   pinbutt.delegate = NULL;
   popbutt.delegate = NULL;
   playbutt.delegate = NULL;
