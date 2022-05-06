@@ -45,14 +45,12 @@ void didDecompress(void *decompressionOutputRefCon, void *sourceFrameRefCon, OSS
       mSPSSize = length - 4;
       mSPS = malloc(mSPSSize);
       memcpy(mSPS, data + 4, mSPSSize);
-      printf("mSPSSize: %lu\r\n", mSPSSize);
       break;
     case 0x08:
       if(mPPS) free(mPPS);
       mPPSSize = length - 4;
       mPPS = malloc(mPPSSize);
       memcpy(mPPS, data + 4, mPPSSize);
-      printf("mPPSSize: %lu\r\n", mPPSSize);
       break;
     case 0x05:
       if(should_reset && mDecodeSession){

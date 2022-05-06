@@ -23,6 +23,8 @@ INC_IMG(play);
 INC_IMG(pause);
 INC_IMG(pinned);
 
+#define DEFAULT_TITLE @"(right click to begin)"
+
 static CGRect kStartRect = {
   .origin = {.x = 0, .y = 0,},
   .size = {.width = kStartSize, .height = kStartSize,},
@@ -76,6 +78,13 @@ static void setWindowSize(NSWindow* window, NSRect windowRect, NSRect screenRect
 @end
 
 @implementation WindowSel
++ (WindowSel*)getDefault{
+  WindowSel* sel = [[WindowSel alloc] init];
+  sel.owner = nil;
+  sel.title = DEFAULT_TITLE;
+  sel.winId = -1;
+  return sel;
+}
 @end
 
 AXError _AXUIElementGetWindow(AXUIElementRef window, CGWindowID *windowID);
@@ -363,6 +372,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   bool mouse_timer_rerun;
 
   NSString* airplay_title;
+  bool was_floating;
   bool is_playing;
   bool is_airplay_session;
   bool shouldEnableFullScreen;
@@ -378,6 +388,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   shouldClose = false;
   isWinClosing = false;
   isPipCLosing = false;
+  was_floating = false;
   
   airplay_title = title;
 
@@ -476,7 +487,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   }
 
 //  [self onMouseEnter:false];
-  [self setOwner:@"PiP" withTitle:is_airplay_session ? airplay_title : @"(right click to begin)"];
+  [self setOwner:nil withTitle:is_airplay_session ? airplay_title : DEFAULT_TITLE];
 
   [self resetPlaybackSate];
 
@@ -488,6 +499,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 }
 
 - (void)setOwner:(NSString*)owner withTitle:(NSString*) title{
+  if(!owner) owner = @"PiP";
   [self setTitle:[NSString localizedStringWithFormat:@"%@ - %@", owner, title]];
 }
 
@@ -531,14 +543,12 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   [self onMouseEnter:false];
 }
 
-- (void)onMouseEnter:(BOOL)value{
-  if([self isFullScreen]) return;
-  bool alphaVal = value;
-  if(pvc) alphaVal = false;
-  if(self.ignoresMouseEvents) alphaVal = false;
-  [[pinbutt animator] setAlphaValue:alphaVal];
+- (void)onMouseEnter:(BOOL)entered{
+  bool alphaVal = entered ? 1 : 0;
+  if(pvc || self.ignoresMouseEvents) alphaVal = 0;
+  if(![self isFullScreen]) [[pinbutt animator] setAlphaValue:alphaVal];
   [[butCont animator] setAlphaValue:alphaVal];
-  [[[[self standardWindowButton:NSWindowCloseButton] superview] animator] setAlphaValue:alphaVal];
+  [[[[self standardWindowButton:NSWindowCloseButton] superview] animator] setAlphaValue:[self isFullScreen] ? 1 : alphaVal];
 }
 
 - (void)setupPushPin:(bool)active{
@@ -546,6 +556,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 }
 
 - (void)toggleFloat{
+  if([self isFullScreen]) return;
   if(self.level == NSFloatingWindowLevel) self.level = NSNormalWindowLevel;
   else self.level = NSFloatingWindowLevel;
 }
@@ -601,13 +612,14 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 }
 
 - (void)windowDidEnterFullScreen:(NSNotification *)notification{
-  NSLog(@"windowDidEnterFullScreen");
   pinbutt.hidden = true;
+  was_floating = self.level == NSFloatingWindowLevel;
+  self.level = NSNormalWindowLevel;
 }
 
 - (void)windowDidExitFullScreen:(NSNotification *)notification{
-  NSLog(@"windowDidExitFullScreen");
   pinbutt.hidden = false;
+  if(was_floating) self.level = NSFloatingWindowLevel;
 }
 
 - (void)togglePlayback{
@@ -787,11 +799,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
   NSMenuItem* item = [[NSMenuItem alloc] init];
   [item setTarget:self];
-  WindowSel* sel = [[WindowSel alloc] init];
-  sel.owner = @"PiP";
-  sel.title = @"(right click to begin)";
-  sel.winId = -1;
-  [item setRepresentedObject:sel];
+  [item setRepresentedObject:[WindowSel getDefault]];
   [self changeWindow:item];
 }
 
@@ -831,11 +839,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   if(window_id >= 0 && !is_airplay_session){
     NSMenuItem* item = [theMenu addItemWithTitle:@"clear window" action:@selector(changeWindow:) keyEquivalent:@""];
     [item setTarget:self];
-    WindowSel* sel = [[WindowSel alloc] init];
-    sel.owner = @"PiP";
-    sel.title = @"(right click to begin)";
-    sel.winId = -1;
-    [item setRepresentedObject:sel];
+    [item setRepresentedObject:[WindowSel getDefault]];
   }
 
   if(!pvc){
@@ -855,8 +859,6 @@ static CGImageRef CaptureWindow(CGWindowID wid){
     [theMenu addItem:itemSlider];
   }
 
-  NSArray *screenArray = [NSScreen screens];
-
   if(is_airplay_session) goto end;
   [theMenu addItem:[NSMenuItem separatorItem]];
 
@@ -865,7 +867,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   bool should_exclude_windows_with_empty_title = [(NSNumber*)getPref(@"wfilter_epmty_title") intValue] > 0;
   bool should_exclude_floating_windows = [(NSNumber*)getPref(@"wfilter_floating") intValue] > 0;
 
-  for(NSScreen* screen in screenArray){
+  for(NSScreen* screen in [NSScreen screens]){
     NSDictionary* dict = [screen deviceDescription];
     // NSLog(@"%@", dict);
     CGDirectDisplayID did = [dict[@"NSScreenNumber"] intValue];
@@ -875,7 +877,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
     [item setTarget:self];
 
     WindowSel* sel = [[WindowSel alloc] init];
-    sel.owner = @"PiP";
+    sel.owner = nil;
     sel.title = windowTitle;
     sel.winId = 0;
     sel.dspId = did;
