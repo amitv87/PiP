@@ -57,10 +57,14 @@
   NSSize imageSize = self.image.extent.size;
   float scale = frameSize.width / imageSize.width;
 
-  if(rect.size.width * rect.size.height <= 1) return;
+  if(rect.size.width * rect.size.height <= 1) goto end;
   rect = NSMakeRect(rect.origin.x / scale, rect.origin.y / scale, rect.size.width / scale, rect.size.height / scale);
-  if(rect.size.width * rect.size.height <= 1) return;
+  if(rect.size.width * rect.size.height <= 1) goto end;
   cropRect = rect;
+  return;
+
+  end:
+  cropRect = CGRectZero;
 }
 
 - (void)drawInMTKView:(MTKView *)view {

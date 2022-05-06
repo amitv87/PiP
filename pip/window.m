@@ -72,6 +72,7 @@ static void setWindowSize(NSWindow* window, NSRect windowRect, NSRect screenRect
 @property (nonatomic) NSString* owner;
 @property (nonatomic) NSString* title;
 @property (nonatomic) CGWindowID winId;
+@property (nonatomic) CGDirectDisplayID dspId;
 @end
 
 @implementation WindowSel
@@ -181,7 +182,6 @@ static void bringWindoToForeground(CGWindowID wid){
 }
 
 static CGImageRef CaptureWindow(CGWindowID wid){
-  if(!wid) return CGDisplayCreateImage(kCGDirectMainDisplay);
   CGImageRef window_image = NULL;
   CFArrayRef window_image_arr = NULL;
   window_image_arr = CGSHWCaptureWindowList(CGSMainConnectionID(), &wid, 1, kCGSCaptureIgnoreGlobalClipShape | kCGSWindowCaptureNominalResolution);
@@ -366,6 +366,8 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   bool is_playing;
   bool is_airplay_session;
   bool shouldEnableFullScreen;
+
+  CGDirectDisplayID display_id;
 }
 
 - (id) initWithAirplay:(bool)enable andTitle:(NSString*)title{
@@ -755,7 +757,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 }
 
 - (void)capture{
-  CGImageRef window_image = CaptureWindow(window_id);
+  CGImageRef window_image = window_id == 0 ? CGDisplayCreateImage(display_id) : CaptureWindow(window_id);
   if(window_image != NULL){
     CIImage* ciimage = [CIImage imageWithCGImage:window_image];
     CGRect imageRect = [ciimage extent];
@@ -853,6 +855,8 @@ static CGImageRef CaptureWindow(CGWindowID wid){
     [theMenu addItem:itemSlider];
   }
 
+  NSArray *screenArray = [NSScreen screens];
+
   if(is_airplay_session) goto end;
   [theMenu addItem:[NSMenuItem separatorItem]];
 
@@ -861,9 +865,12 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   bool should_exclude_windows_with_empty_title = [(NSNumber*)getPref(@"wfilter_epmty_title") intValue] > 0;
   bool should_exclude_floating_windows = [(NSNumber*)getPref(@"wfilter_floating") intValue] > 0;
 
-  {
-    NSString* windowTitle = [NSString stringWithFormat:@"Main Display"];
+  for(NSScreen* screen in screenArray){
+    NSDictionary* dict = [screen deviceDescription];
+    // NSLog(@"%@", dict);
+    CGDirectDisplayID did = [dict[@"NSScreenNumber"] intValue];
 
+    NSString* windowTitle = [NSString stringWithFormat:@"Display %u", did];
     NSMenuItem* item = [theMenu addItemWithTitle:windowTitle action:@selector(changeWindow:) keyEquivalent:@""];
     [item setTarget:self];
 
@@ -871,8 +878,11 @@ static CGImageRef CaptureWindow(CGWindowID wid){
     sel.owner = @"PiP";
     sel.title = windowTitle;
     sel.winId = 0;
+    sel.dspId = did;
     [item setRepresentedObject:sel];
   }
+
+  [theMenu addItem:[NSMenuItem separatorItem]];
 
   uint32_t windowId = 0;
   CGWindowListOption win_option = kCGWindowListOptionAll;
@@ -941,7 +951,7 @@ end:
 }
 
 - (void)setScale:(id)sender{
-  if(window_id > 0 || is_airplay_session) [imageView.renderer setScale:[sender tag]];
+  if(window_id >= 0 || is_airplay_session) [imageView.renderer setScale:[sender tag]];
 }
 
 - (void)adjustOpacity:(id)sender{
@@ -959,6 +969,7 @@ end:
   }
 
   window_id = sel.winId;
+  display_id = sel.dspId;
   [self startTimer:1.0/refreshRate];
 
   [self setMovable:YES];
