@@ -16,7 +16,7 @@ Now with AirPlay receiver support (if on macOS 12+, turn-off built-in AirPlay re
 
 ## Features
 * Clone any visibile window
-* Clone any active display
+* Clone multiple active display
 * Crop the preview
 * Auto and manual resize preserving the aspect ratio
 * Multiple window preview from same process, ```cmd+n``` to open and ```cmd+w``` to close
