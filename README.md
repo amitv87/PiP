@@ -16,6 +16,7 @@ Now with AirPlay receiver support (if on macOS 12+, turn-off built-in AirPlay re
 
 ## Features
 * Clone any visibile window
+* Clone any active display
 * Crop the preview
 * Auto and manual resize preserving the aspect ratio
 * Multiple window preview from same process, ```cmd+n``` to open and ```cmd+w``` to close
@@ -32,7 +33,7 @@ Now with AirPlay receiver support (if on macOS 12+, turn-off built-in AirPlay re
 
 ### Manual download
 
-[PiP-2.11.dmg](https://github.com/amitv87/PiP/releases/download/v2.11/PiP-2.11.dmg)
+[PiP-2.12.dmg](https://github.com/amitv87/PiP/releases/download/v2.12/PiP-2.12.dmg)
 
 ### Download and install via Homebrew
 
