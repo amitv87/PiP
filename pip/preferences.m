@@ -19,10 +19,10 @@ typedef enum{
 } OptionType;
 
 #define OPTION(name, text, type, options, value, desc) \
-  @#name : @{@"name": @#name, @"text": @text, @"type": [NSNumber numberWithInt:OptionType##type], @"options": options, @"value": value, @"desc": desc}
+  @{@"name": @#name, @"text": @text, @"type": [NSNumber numberWithInt:OptionType##type], @"options": options, @"value": value, @"desc": desc}
 
-static NSDictionary* getDefaultPrefs(void){
-  return @{
+static NSArray* getPrefsArray(void){
+  return @[
     OPTION(renderer, "Display Renderer", Select, (@[@"Metal", @"Opengl"]), [NSNumber numberWithInt:DisplayRendererTypeOpenGL], [NSNull null]),
     #ifndef NO_AIRPLAY
     OPTION(airplay, "AirPlay Receiver", CheckBox, [NSNull null], @1, @"Use PiP as Airplay receiver"),
@@ -31,7 +31,14 @@ static NSDictionary* getDefaultPrefs(void){
     OPTION(wfilter_epmty_title, "Exclude windows", CheckBox, [NSNull null], @1, @"when title is empty"),
     OPTION(wfilter_floating, "Exclude windows", CheckBox, [NSNull null], @1, @"that are floating"),
     OPTION(wfilter_desktop_elemnts, "Exclude windows", CheckBox, [NSNull null], @1, @"that are desktop elements"),
-  };
+    OPTION(mouse_capture, "Show mouse cursor", CheckBox, [NSNull null], @0, @"when pipping screen"),
+  ];
+}
+
+static NSDictionary* getDefaultPrefs(void){
+  NSMutableDictionary* prefs = [[NSMutableDictionary alloc] init];
+  for(NSDictionary* opt in getPrefsArray()) [prefs setObject:opt forKey:opt[@"name"]];
+  return prefs;
 }
 
 void setPref(NSString* key, NSObject* val){
@@ -44,13 +51,6 @@ NSObject* getPref(NSString* key){
   if(!val) val = getDefaultPrefs()[key][@"value"];
 //  NSLog(@"getPref %@ -> %@", key, val);
   return val;
-}
-
-static NSArray* getPrefsArray(void){
-  NSMutableArray* arr = [[NSMutableArray alloc] init];
-  NSDictionary* prefs = getDefaultPrefs();
-  for(id key in prefs) [arr addObject:[prefs objectForKey:key]];
-  return arr;
 }
 
 @implementation Preferences{

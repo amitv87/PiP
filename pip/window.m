@@ -378,6 +378,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   bool shouldEnableFullScreen;
 
   CGDirectDisplayID display_id;
+  CGDisplayStreamRef display_stream;
 }
 
 - (id) initWithAirplay:(bool)enable andTitle:(NSString*)title{
@@ -391,8 +392,10 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   was_floating = false;
   
   airplay_title = title;
+  display_stream = NULL;
 
   shouldEnableFullScreen = is_playing = is_airplay_session = enable;
+
 
   self = [super initWithContentRect:kStartRect styleMask:kWindowMask backing:NSBackingStoreBuffered defer:YES];
 
@@ -624,7 +627,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
 - (void)togglePlayback{
   if(isWinClosing) return;
-  if(is_airplay_session){
+  if(is_airplay_session || window_id == 0){
     is_playing = !is_playing;
     [self resetPlaybackSate];
   }
@@ -961,8 +964,17 @@ end:
   [self setAlphaValue:slider.doubleValue];
 }
 
+-(void)stopDisplayStream{
+  if(!display_stream) return;
+  CGDisplayStreamStop(display_stream);
+  CFRelease(display_stream);
+  display_stream = NULL;
+}
+
 - (void)changeWindow:(id)sender{
   WindowSel* sel = [sender representedObject];
+
+  [self stopDisplayStream];
 
   if(sel.winId >= 0){
     NSSize size = [self frame].size;
@@ -972,6 +984,26 @@ end:
 
   window_id = sel.winId;
   display_id = sel.dspId;
+
+  if(window_id == 0){
+    size_t width = CGDisplayPixelsWide(display_id);
+    size_t height = CGDisplayPixelsHigh(display_id);
+
+    NSDictionary* opts = @{
+      (__bridge NSString *)kCGDisplayStreamMinimumFrameTime : @(1.0f / refreshRate),
+      (__bridge NSString *)kCGDisplayStreamShowCursor : [(NSNumber*)getPref(@"mouse_capture") intValue] > 0 ? @YES : @NO,
+    };
+
+    display_stream = CGDisplayStreamCreateWithDispatchQueue(display_id, width, height, kCVPixelFormatType_32BGRA,  (__bridge CFDictionaryRef)opts, dispatch_get_main_queue(), ^(CGDisplayStreamFrameStatus status, uint64_t displayTime, IOSurfaceRef frameSurface, CGDisplayStreamUpdateRef updateRef) {
+      if(status != kCGDisplayStreamFrameStatusFrameComplete || !self->is_playing || self->isWinClosing) return;
+      [self->imageView setImage:[CIImage imageWithIOSurface:frameSurface]];
+    });
+    CGDisplayStreamStart(display_stream);
+
+    [self stopTimer];
+    is_playing = true;
+    [self resetPlaybackSate];
+  } else
   [self startTimer:1.0/refreshRate];
 
   [self setMovable:YES];
@@ -1036,6 +1068,7 @@ end:
   #endif
 
   [self stopTimer];
+  [self stopDisplayStream];
 
   window_id = -1;
   pinbutt.delegate = NULL;
