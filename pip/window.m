@@ -73,8 +73,8 @@ static void setWindowSize(NSWindow* window, NSRect windowRect, NSRect screenRect
 @interface WindowSel : NSObject{}
 @property (nonatomic) NSString* owner;
 @property (nonatomic) NSString* title;
-@property (nonatomic) CGWindowID winId;
-@property (nonatomic) CGDirectDisplayID dspId;
+@property (nonatomic) int winId;
+@property (nonatomic) int dspId;
 @end
 
 @implementation WindowSel
@@ -83,6 +83,7 @@ static void setWindowSize(NSWindow* window, NSRect windowRect, NSRect screenRect
   sel.owner = nil;
   sel.title = DEFAULT_TITLE;
   sel.winId = -1;
+  sel.dspId = -1;
   return sel;
 }
 @end
@@ -377,7 +378,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   bool is_airplay_session;
   bool shouldEnableFullScreen;
 
-  CGDirectDisplayID display_id;
+  int display_id;
   CGDisplayStreamRef display_stream;
 }
 
@@ -627,7 +628,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
 - (void)togglePlayback{
   if(isWinClosing) return;
-  if(is_airplay_session || window_id == 0){
+  if(is_airplay_session || display_id >= 0){
     is_playing = !is_playing;
     [self resetPlaybackSate];
   }
@@ -708,6 +709,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
 - (void)pipWillClose:(PIPViewController *)pip{
 //  NSLog(@"pipWillClose");
+  if(isPipCLosing) return;
   isPipCLosing = true;
   [pvc dismissViewController:nvc];
 }
@@ -735,7 +737,6 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 }
 
 - (void)onResize:(CGSize)size andAspectRatio:(CGSize) ar{
-  if(window_id < 0 && !is_airplay_session) return;
   [self setAspectRatio:ar];
   if(pvc) [pvc setAspectRatio:ar];
   else{
@@ -772,7 +773,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 }
 
 - (void)capture{
-  CGImageRef window_image = window_id == 0 ? CGDisplayCreateImage(display_id) : CaptureWindow(window_id);
+  CGImageRef window_image = window_id >= 0 ? CaptureWindow(window_id) : (display_id >= 0 ? CGDisplayCreateImage(display_id) : NULL);
   if(window_image != NULL){
     CIImage* ciimage = [CIImage imageWithCGImage:window_image];
     CGRect imageRect = [ciimage extent];
@@ -807,7 +808,11 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 }
 
 - (void)onDoubleClick:(NSEvent *)theEvent{
-  if(window_id > 0) bringWindoToForeground(window_id);
+  if(window_id >= 0) bringWindoToForeground(window_id);
+}
+
+- (bool)is_capturing{
+  return display_id >= 0 || window_id >= 0;
 }
 
 - (void)rightMouseDown:(NSEvent *)theEvent {
@@ -827,7 +832,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   NSMenuItem* item = [theMenu addItemWithTitle:[NSString stringWithFormat:@"%snative pip", (pvc ? "exit " : "") ] action:@selector(toggleNativePip) keyEquivalent:@""];
   [item setTarget:self];
 
-  if(!pvc && (window_id >= 0 || is_airplay_session)){
+  if(!pvc && ([self is_capturing] || is_airplay_session)){
     NSSize cropSize = [imageView.renderer cropRect].size;
     if(cropSize.width * cropSize.height == 0){
       NSMenuItem* item = [theMenu addItemWithTitle:@"select region" action:@selector(selectRegion:) keyEquivalent:@""];
@@ -839,7 +844,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
     }
   }
 
-  if(window_id >= 0 && !is_airplay_session){
+  if([self is_capturing] && !is_airplay_session){
     NSMenuItem* item = [theMenu addItemWithTitle:@"clear window" action:@selector(changeWindow:) keyEquivalent:@""];
     [item setTarget:self];
     [item setRepresentedObject:[WindowSel getDefault]];
@@ -876,13 +881,13 @@ static CGImageRef CaptureWindow(CGWindowID wid){
     CGDirectDisplayID did = [dict[@"NSScreenNumber"] intValue];
 
     NSString* windowTitle = [NSString stringWithFormat:@"Display %u", did];
+    if (@available(macOS 10.15, *)) windowTitle = [NSString stringWithFormat:@"%@", [screen localizedName]];
+
     NSMenuItem* item = [theMenu addItemWithTitle:windowTitle action:@selector(changeWindow:) keyEquivalent:@""];
     [item setTarget:self];
 
-    WindowSel* sel = [[WindowSel alloc] init];
-    sel.owner = nil;
+    WindowSel* sel = [WindowSel getDefault];
     sel.title = windowTitle;
-    sel.winId = 0;
     sel.dspId = did;
     [item setRepresentedObject:sel];
   }
@@ -942,7 +947,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
     NSMenuItem* item = [theMenu addItemWithTitle:windowTitle action:@selector(changeWindow:) keyEquivalent:@""];
     [item setTarget:self];
 
-    WindowSel* sel = [[WindowSel alloc] init];
+    WindowSel* sel = [WindowSel getDefault];
     sel.owner = owner;
     sel.title = name;
     sel.winId = windowId;
@@ -956,7 +961,7 @@ end:
 }
 
 - (void)setScale:(id)sender{
-  if(window_id >= 0 || is_airplay_session) [imageView.renderer setScale:[sender tag]];
+  if([self is_capturing] || is_airplay_session) [imageView.renderer setScale:[sender tag]];
 }
 
 - (void)adjustOpacity:(id)sender{
@@ -973,19 +978,20 @@ end:
 
 - (void)changeWindow:(id)sender{
   WindowSel* sel = [sender representedObject];
+  if(window_id == sel.winId && display_id == sel.dspId) return;
 
+  [self stopTimer];
   [self stopDisplayStream];
-
-  if(sel.winId >= 0){
-    NSSize size = [self frame].size;
-    size.height = size.width;
-    [self onResize:size andAspectRatio:kStartRect.size];
-  }
 
   window_id = sel.winId;
   display_id = sel.dspId;
 
-  if(window_id == 0){
+  if(![self is_capturing]){
+    NSSize size = [self frame].size;
+    size.height = size.width;
+    [self onResize:size andAspectRatio:kStartRect.size];
+  }
+  else if(display_id >= 0){
     size_t width = CGDisplayPixelsWide(display_id);
     size_t height = CGDisplayPixelsHigh(display_id);
 
@@ -1000,18 +1006,19 @@ end:
     });
     CGDisplayStreamStart(display_stream);
 
-    [self stopTimer];
     is_playing = true;
     [self resetPlaybackSate];
-  } else
-  [self startTimer:1.0/refreshRate];
+  }
+  else if(window_id >= 0){
+    [self startTimer:1.0/refreshRate];
+  }
 
   [self setMovable:YES];
   [selectionView removeFromSuperview];
   dispatch_async(dispatch_get_main_queue(), ^{[[NSCursor arrowCursor] set];});
 
   [imageView setImage:nil];
-  [imageView setHidden:window_id < 0];
+  [imageView setHidden:![self is_capturing]];
   [self setOwner:sel.owner withTitle:sel.title];
 }
 
