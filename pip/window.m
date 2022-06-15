@@ -951,7 +951,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
 //    NSLog(@"%@", (__bridge NSDictionary*)window_ref);
 
-    NSNumber* key = [NSNumber numberWithInt:ownerPid];
+    NSString* key = [NSString stringWithFormat:@"%@_%u", owner, ownerPid];
     NSMutableArray* window_arr = window_dict[key];
     if(!window_arr) window_dict[key] = window_arr = [[NSMutableArray alloc] init];
 
@@ -965,7 +965,9 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
   CFRelease(all_windows);
 
-  for(NSMutableArray* window_arr in window_dict.allValues){
+  for(NSString* key in [window_dict.allKeys sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)]){
+    NSMutableArray* _arr = window_dict[key];
+    NSArray* window_arr = [_arr sortedArrayUsingDescriptors:@[[[NSSortDescriptor alloc] initWithKey:@"title" ascending:YES]]];
     NSMenu *proc_menu = theMenu;
     if(window_arr.count > 1){
       WindowSel* proc_sel = window_arr[0];
