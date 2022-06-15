@@ -75,6 +75,7 @@ static void setWindowSize(NSWindow* window, NSRect windowRect, NSRect screenRect
 @property (nonatomic) NSString* title;
 @property (nonatomic) int winId;
 @property (nonatomic) int dspId;
+@property (nonatomic) int ownerPid;
 @end
 
 @implementation WindowSel
@@ -84,6 +85,7 @@ static void setWindowSize(NSWindow* window, NSRect windowRect, NSRect screenRect
   sel.title = DEFAULT_TITLE;
   sel.winId = -1;
   sel.dspId = -1;
+  sel.ownerPid = -1;
   return sel;
 }
 @end
@@ -386,6 +388,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   pvc = nil;
   timer = NULL;
   window_id = -1;
+  display_id = -1;
   refreshRate = 30;
   shouldClose = false;
   isWinClosing = false;
@@ -867,7 +870,10 @@ static CGImageRef CaptureWindow(CGWindowID wid){
     [theMenu addItem:itemSlider];
   }
 
+  NSMutableDictionary* window_dict = [[NSMutableDictionary alloc] init];
+
   if(is_airplay_session) goto end;
+
   [theMenu addItem:[NSMenuItem separatorItem]];
 
   bool should_exclude_desktop_elements = [(NSNumber*)getPref(@"wfilter_desktop_elemnts") intValue] > 0;
@@ -894,7 +900,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
   [theMenu addItem:[NSMenuItem separatorItem]];
 
-  uint32_t windowId = 0;
+  uint32_t windowId = 0, ownerPid = 0;
   CGWindowListOption win_option = kCGWindowListOptionAll;
   if(should_exclude_desktop_elements) win_option |= kCGWindowListExcludeDesktopElements;
   CFArrayRef all_windows = CGWindowListCopyWindowInfo(win_option, kCGNullWindowID);
@@ -915,6 +921,9 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
     CFNumberRef id_ref = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowNumber);
     CFNumberGetValue(id_ref, kCFNumberIntType, &windowId);
+
+    id_ref = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowOwnerPID);
+    CFNumberGetValue(id_ref, kCFNumberIntType, &ownerPid);
 
     bool isFaulty = true;
     CFDictionaryRef bounds = (CFDictionaryRef)CFDictionaryGetValue (window_ref, kCGWindowBounds);
@@ -942,19 +951,34 @@ static CGImageRef CaptureWindow(CGWindowID wid){
 
 //    NSLog(@"%@", (__bridge NSDictionary*)window_ref);
 
-    NSString* windowTitle = [NSString stringWithFormat:@"%@ - %@", owner, name];
-
-    NSMenuItem* item = [theMenu addItemWithTitle:windowTitle action:@selector(changeWindow:) keyEquivalent:@""];
-    [item setTarget:self];
+    NSNumber* key = [NSNumber numberWithInt:ownerPid];
+    NSMutableArray* window_arr = window_dict[key];
+    if(!window_arr) window_dict[key] = window_arr = [[NSMutableArray alloc] init];
 
     WindowSel* sel = [WindowSel getDefault];
     sel.owner = owner;
     sel.title = name;
     sel.winId = windowId;
-    [item setRepresentedObject:sel];
+    sel.ownerPid = ownerPid;
+    [window_arr addObject:sel];
   }
 
   CFRelease(all_windows);
+
+  for(NSMutableArray* window_arr in window_dict.allValues){
+    NSMenu *proc_menu = theMenu;
+    if(window_arr.count > 1){
+      WindowSel* proc_sel = window_arr[0];
+      NSMenuItem* item = [theMenu addItemWithTitle:[NSString stringWithFormat:@"%@", proc_sel.owner] action:nil keyEquivalent:@""];
+      [item setSubmenu:proc_menu = [[NSMenu alloc] init]];
+    }
+    for(WindowSel* sel in window_arr){
+      NSString* windowTitle = window_arr.count > 1 ? [NSString stringWithFormat:@"%@", sel.title] : [NSString stringWithFormat:@"%@ - %@", sel.owner, sel.title];
+      NSMenuItem* item = [proc_menu addItemWithTitle:windowTitle action:@selector(changeWindow:) keyEquivalent:@""];
+      [item setTarget:self];
+      [item setRepresentedObject:sel];
+    }
+  }
 
 end:
   [NSMenu popUpContextMenu:theMenu withEvent:theEvent forView:rootView];
