@@ -16,12 +16,22 @@
 #include "incbin.h"
 #define INC_IMG(x) INCBIN(img_##x##_, "img/" #x ".png")
 #define GET_IMG(x) [[NSImage alloc] initWithData:[NSData dataWithBytes:gimg_##x##_Data length:gimg_##x##_Size]]
+#define GET_REL_IMG(x) get_rel_image(GET_IMG(x))
 
 INC_IMG(pin);
 INC_IMG(pop);
 INC_IMG(play);
 INC_IMG(pause);
 INC_IMG(pinned);
+INC_IMG(opacity);
+
+INC_IMG(stop);
+INC_IMG(crop);
+INC_IMG(uncrop);
+INC_IMG(pop_in);
+INC_IMG(pop_out);
+INC_IMG(display);
+INC_IMG(windows);
 
 #define DEFAULT_TITLE @"(right click to begin)"
 
@@ -202,6 +212,29 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   return window_image;
 }
 
+static NSImage* invert_image(NSImage* img){
+  CIImage* ciImage = [[CIImage alloc] initWithData:[img TIFFRepresentation]];
+  CIFilter* filter = [CIFilter filterWithName:@"CIColorInvert"];
+  [filter setDefaults];
+  [filter setValue:ciImage forKey:@"inputImage"];
+  CIImage* output = [filter valueForKey:@"outputImage"];
+  [output drawAtPoint:NSZeroPoint fromRect:NSRectFromCGRect([output extent]) operation:NSCompositingOperationSourceOver fraction:1.0];
+
+  NSCIImageRep *rep = [NSCIImageRep imageRepWithCIImage:output];
+  NSImage *nsImage = [[NSImage alloc] initWithSize:rep.size];
+  [nsImage addRepresentation:rep];
+  return  nsImage;
+}
+
+static bool is_dark_mode(){
+  return [[[NSUserDefaults standardUserDefaults] stringForKey:@"AppleInterfaceStyle"]  isEqual: @"Dark"];
+}
+
+static NSImage* get_rel_image(NSImage* img){
+  if(is_dark_mode()) return invert_image(img);
+  return img;
+}
+
 @interface NSImage (ImageAdditions)
 +(NSImage *)swatchWithColor:(NSColor *)color size:(NSSize)size;
 @end
@@ -380,6 +413,7 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   bool is_airplay_session;
   bool shouldEnableFullScreen;
 
+  int owner_pid;
   int display_id;
   CGDisplayStreamRef display_stream;
 }
@@ -399,7 +433,6 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   display_stream = NULL;
 
   shouldEnableFullScreen = is_playing = is_airplay_session = enable;
-
 
   self = [super initWithContentRect:kStartRect styleMask:kWindowMask backing:NSBackingStoreBuffered defer:YES];
 
@@ -818,7 +851,25 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   return display_id >= 0 || window_id >= 0;
 }
 
+#define ADD_MENU_ITEM(dest, title, actn, img, ...) {\
+  NSMenuItem* item = [dest addItemWithTitle:title action:actn keyEquivalent:@""]; \
+  item.image = img; \
+  if(item.image) [item.image setSize:NSMakeSize(16, 16)]; \
+  [item setTarget:self]; \
+  __VA_ARGS__ \
+}
+
 - (void)rightMouseDown:(NSEvent *)theEvent {
+  NSMenu *theMenu = [[NSMenu alloc] init];
+  [theMenu setMinimumWidth:100];
+
+  NSMutableDictionary* window_dict = [[NSMutableDictionary alloc] init];
+  NSArray* screens = [NSScreen screens];
+  NSMenu* display_menu = [[NSMenu alloc] init];
+  NSMenu* window_menu = [[NSMenu alloc] init];
+
+  if(is_airplay_session) goto end;
+
   if(@available(macOS 11.0, *)) {
     if(!CGPreflightScreenCaptureAccess()){
       NSAlert *alert = [[NSAlert alloc] init];
@@ -830,75 +881,33 @@ static CGImageRef CaptureWindow(CGWindowID wid){
     }
   }
 
-  NSMenu *theMenu = [[NSMenu alloc] init];
-  [theMenu setMinimumWidth:100];
-  NSMenuItem* item = [theMenu addItemWithTitle:[NSString stringWithFormat:@"%snative pip", (pvc ? "exit " : "") ] action:@selector(toggleNativePip) keyEquivalent:@""];
-  [item setTarget:self];
-
-  if(!pvc && ([self is_capturing] || is_airplay_session)){
-    NSSize cropSize = [imageView.renderer cropRect].size;
-    if(cropSize.width * cropSize.height == 0){
-      NSMenuItem* item = [theMenu addItemWithTitle:@"select region" action:@selector(selectRegion:) keyEquivalent:@""];
-      [item setTarget:self];
-    }
-    else{
-      NSMenuItem* item = [theMenu addItemWithTitle:@"clear region" action:@selector(clearSelection:) keyEquivalent:@""];
-      [item setTarget:self];
-    }
-  }
-
-  if([self is_capturing] && !is_airplay_session){
-    NSMenuItem* item = [theMenu addItemWithTitle:@"clear window" action:@selector(changeWindow:) keyEquivalent:@""];
-    [item setTarget:self];
-    [item setRepresentedObject:[WindowSel getDefault]];
-  }
-
-  if(!pvc){
-    NSSlider* slider = [[NSSlider alloc] init];
-
-    [slider setTarget:self];
-    [slider setMinValue:0.1];
-    [slider setMaxValue:1.0];
-    [slider setDoubleValue:[[nvc view] window].alphaValue];
-    [slider setFrame:NSMakeRect(0, 0, 200, 30)];
-    [slider setAction:@selector(adjustOpacity:)];
-    [slider setAutoresizingMask:NSViewWidthSizable];
-
-    NSMenuItem* itemSlider = [[NSMenuItem alloc] init];
-    [itemSlider setEnabled:YES];
-    [itemSlider setView:slider];
-    [theMenu addItem:itemSlider];
-  }
-
-  NSMutableDictionary* window_dict = [[NSMutableDictionary alloc] init];
-
-  if(is_airplay_session) goto end;
-
-  [theMenu addItem:[NSMenuItem separatorItem]];
+//  [theMenu addItem:[NSMenuItem separatorItem]];
 
   bool should_exclude_desktop_elements = [(NSNumber*)getPref(@"wfilter_desktop_elemnts") intValue] > 0;
   bool should_exclude_windows_with_null_title = [(NSNumber*)getPref(@"wfilter_null_title") intValue] > 0;
   bool should_exclude_windows_with_empty_title = [(NSNumber*)getPref(@"wfilter_epmty_title") intValue] > 0;
   bool should_exclude_floating_windows = [(NSNumber*)getPref(@"wfilter_floating") intValue] > 0;
 
-  for(NSScreen* screen in [NSScreen screens]){
+  for(NSScreen* screen in screens){
     NSDictionary* dict = [screen deviceDescription];
-    // NSLog(@"%@", dict);
+//    NSLog(@"%@", dict);
     CGDirectDisplayID did = [dict[@"NSScreenNumber"] intValue];
 
     NSString* windowTitle = [NSString stringWithFormat:@"Display %u", did];
     if (@available(macOS 10.15, *)) windowTitle = [NSString stringWithFormat:@"%@", [screen localizedName]];
 
-    NSMenuItem* item = [theMenu addItemWithTitle:windowTitle action:@selector(changeWindow:) keyEquivalent:@""];
-    [item setTarget:self];
-
     WindowSel* sel = [WindowSel getDefault];
     sel.title = windowTitle;
     sel.dspId = did;
-    [item setRepresentedObject:sel];
+
+    NSMenu* dest_menu = display_menu;
+//    if(screens.count == 1) dest_menu = theMenu;
+    ADD_MENU_ITEM(dest_menu, windowTitle, @selector(changeWindow:), NULL, {
+      [item setRepresentedObject:sel];
+    })
   }
 
-  [theMenu addItem:[NSMenuItem separatorItem]];
+//  [theMenu addItem:[NSMenuItem separatorItem]];
 
   uint32_t windowId = 0, ownerPid = 0;
   CGWindowListOption win_option = kCGWindowListOptionAll;
@@ -955,6 +964,8 @@ static CGImageRef CaptureWindow(CGWindowID wid){
     NSMutableArray* window_arr = window_dict[key];
     if(!window_arr) window_dict[key] = window_arr = [[NSMutableArray alloc] init];
 
+    if(!name || name.length == 0) name = [NSString stringWithFormat:@"win_%u", windowId];
+
     WindowSel* sel = [WindowSel getDefault];
     sel.owner = owner;
     sel.title = name;
@@ -966,23 +977,80 @@ static CGImageRef CaptureWindow(CGWindowID wid){
   CFRelease(all_windows);
 
   for(NSString* key in [window_dict.allKeys sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)]){
-    NSMutableArray* _arr = window_dict[key];
-    NSArray* window_arr = [_arr sortedArrayUsingDescriptors:@[[[NSSortDescriptor alloc] initWithKey:@"title" ascending:YES]]];
-    NSMenu *proc_menu = theMenu;
+    NSArray* window_arr = [window_dict[key] sortedArrayUsingDescriptors:@[[[NSSortDescriptor alloc] initWithKey:@"title" ascending:YES]]];
+    NSMenu *dest_menu = window_menu;
+//    if(window_dict.allKeys.count == 1) dest_menu = theMenu;
+    WindowSel* proc_sel = window_arr[0];
+    NSImage *icon = [[NSRunningApplication runningApplicationWithProcessIdentifier: proc_sel.ownerPid] icon];
+    if(!icon) icon = [[NSWorkspace sharedWorkspace] iconForFileType:NSFileTypeForHFSTypeCode(kGenericApplicationIcon)];
+
     if(window_arr.count > 1){
-      WindowSel* proc_sel = window_arr[0];
-      NSMenuItem* item = [theMenu addItemWithTitle:[NSString stringWithFormat:@"%@", proc_sel.owner] action:nil keyEquivalent:@""];
-      [item setSubmenu:proc_menu = [[NSMenu alloc] init]];
+      ADD_MENU_ITEM(dest_menu, ([NSString stringWithFormat:@"%@", proc_sel.owner]), nil, icon, {
+        [item setSubmenu:dest_menu = [[NSMenu alloc] init]];
+      })
     }
     for(WindowSel* sel in window_arr){
       NSString* windowTitle = window_arr.count > 1 ? [NSString stringWithFormat:@"%@", sel.title] : [NSString stringWithFormat:@"%@ - %@", sel.owner, sel.title];
-      NSMenuItem* item = [proc_menu addItemWithTitle:windowTitle action:@selector(changeWindow:) keyEquivalent:@""];
-      [item setTarget:self];
-      [item setRepresentedObject:sel];
+      ADD_MENU_ITEM(dest_menu, windowTitle, @selector(changeWindow:), (dest_menu == window_menu ? icon : NULL), {
+        [item setRepresentedObject:sel];
+      })
     }
   }
 
+  if(display_menu.numberOfItems > 0){
+    ADD_MENU_ITEM(theMenu, @"Select Display", nil, GET_REL_IMG(display), {
+      [item setSubmenu:display_menu];
+    })
+  }
+
+  if(window_menu.numberOfItems > 0){
+    ADD_MENU_ITEM(theMenu, @"Select Window", nil, GET_REL_IMG(windows), {
+      [item setSubmenu:window_menu];
+    })
+  }
+
 end:
+  if(!pvc && ([self is_capturing] || is_airplay_session)){
+    NSSize cropSize = [imageView.renderer cropRect].size;
+    bool can_crop = cropSize.width * cropSize.height == 0;
+    ADD_MENU_ITEM(theMenu, (can_crop ? @"Select region" : @"Deselect region"), can_crop ? @selector(selectRegion:) : @selector(clearSelection:), (can_crop ? GET_REL_IMG(crop) : GET_REL_IMG(uncrop)))
+  }
+
+  if([self is_capturing]){
+    ADD_MENU_ITEM(theMenu, @"Stop Preview", @selector(changeWindow:), GET_REL_IMG(stop), {
+      [item setRepresentedObject:[WindowSel getDefault]];
+    })
+  }
+
+  if(!pvc){
+    NSSlider* slider = [[NSSlider alloc] init];
+
+    [slider setTarget:self];
+    [slider setMinValue:0.1];
+    [slider setMaxValue:1.0];
+    [slider setControlSize:NSControlSizeSmall];
+    [slider setDoubleValue:[[nvc view] window].alphaValue];
+    [slider setFrame:NSMakeRect(36, 6 , 50, 18)];
+    [slider setAction:@selector(adjustOpacity:)];
+    [slider setAutoresizingMask:NSViewWidthSizable];
+
+    NSView* view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 100, 30)];
+    view.autoresizingMask = NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin;
+
+    NSImageView* iv = [[NSImageView alloc] init];
+    [iv setImage:GET_REL_IMG(opacity)];
+    [iv setFrame:NSMakeRect(14, 8, 16, 16)];
+    [view addSubview: iv];
+    [view addSubview:slider];
+
+    NSMenuItem* itemSlider = [[NSMenuItem alloc] init];
+    [itemSlider setEnabled:YES];
+    [itemSlider setView:view];
+    [theMenu addItem:itemSlider];
+  }
+
+  ADD_MENU_ITEM(theMenu, ([NSString stringWithFormat:@"%s native pip", (pvc ? "Exit" : "Enter")]), @selector(toggleNativePip), (pvc ? GET_REL_IMG(pop_in) : GET_REL_IMG(pop_out)))
+
   [NSMenu popUpContextMenu:theMenu withEvent:theEvent forView:rootView];
 }
 
@@ -1011,6 +1079,7 @@ end:
 
   window_id = sel.winId;
   display_id = sel.dspId;
+  owner_pid = sel.ownerPid;
 
   if(![self is_capturing]){
     NSSize size = [self frame].size;

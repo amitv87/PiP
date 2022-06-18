@@ -27,8 +27,8 @@ static NSArray* getPrefsArray(void){
     #ifndef NO_AIRPLAY
     OPTION(airplay, "AirPlay Receiver", CheckBox, [NSNull null], @1, @"Use PiP as Airplay receiver"),
     #endif
-    OPTION(wfilter_null_title, "Exclude windows", CheckBox, [NSNull null], @1, @"when title is null"),
-    OPTION(wfilter_epmty_title, "Exclude windows", CheckBox, [NSNull null], @1, @"when title is empty"),
+    OPTION(wfilter_null_title, "Exclude windows", CheckBox, [NSNull null], @0, @"when title is null"),
+    OPTION(wfilter_epmty_title, "Exclude windows", CheckBox, [NSNull null], @0, @"when title is empty"),
     OPTION(wfilter_floating, "Exclude windows", CheckBox, [NSNull null], @1, @"that are floating"),
     OPTION(wfilter_desktop_elemnts, "Exclude windows", CheckBox, [NSNull null], @1, @"that are desktop elements"),
     OPTION(mouse_capture, "Show mouse cursor", CheckBox, [NSNull null], @0, @"when pipping screen"),
