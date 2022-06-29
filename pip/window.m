@@ -203,6 +203,14 @@ static void bringWindoToForeground(CGWindowID wid){
   CFRelease(window_ref);
 }
 
+static void request_permission(const char* perm_string){
+  NSAlert *alert = [[NSAlert alloc] init];
+  [alert setMessageText:[NSString stringWithFormat:@"Missing %s permission. Please do the needful!", perm_string]];
+  [alert addButtonWithTitle:@"Ok"];
+  [alert runModal];
+  [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:[NSString stringWithFormat:@"x-apple.systempreferences:com.apple.preference.security?Privacy_%s", perm_string]]];
+}
+
 static CGImageRef CaptureWindow(CGWindowID wid){
   CGImageRef window_image = NULL;
   CFArrayRef window_image_arr = NULL;
@@ -844,7 +852,11 @@ static NSImage* get_rel_image(NSImage* img){
 }
 
 - (void)onDoubleClick:(NSEvent *)theEvent{
-  if(window_id >= 0) bringWindoToForeground(window_id);
+  if(window_id < 0) return;
+  bringWindoToForeground(window_id);
+  if(@available(macOS 11.0, *)){
+    if(!AXIsProcessTrusted()) request_permission("Accessibility");
+  }
 }
 
 - (bool)is_capturing{
@@ -870,13 +882,10 @@ static NSImage* get_rel_image(NSImage* img){
 
   if(is_airplay_session) goto end;
 
-  if(@available(macOS 11.0, *)) {
+  if(@available(macOS 11.0, *)){
     if(!CGPreflightScreenCaptureAccess()){
-      NSAlert *alert = [[NSAlert alloc] init];
-      [alert setMessageText:@"Missing screen recording permission, please do the needful to proceed"];
-      [alert addButtonWithTitle:@"Ok"];
-      [alert runModal];
       CGRequestScreenCaptureAccess();
+      request_permission("ScreenCapture");
       return;
     }
   }
