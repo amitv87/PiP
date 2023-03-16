@@ -61,7 +61,7 @@ symlinks = { 'Applications': '/Applications' }
 # pyobjc-framework-Quartz.
 #
 #icon = '/path/to/icon.icns'
-badge_icon = icon_from_app(application)
+# badge_icon = icon_from_app(application)
 
 # Where to put the icons
 icon_locations = {
@@ -101,7 +101,7 @@ show_sidebar = False
 sidebar_width = 180
 
 # Window position in ((x, y), (w, h)) format
-window_rect = ((100, 100), (640, 280))
+window_rect = ((100, 100), (640, 360))
 
 # Select the default view; must be one of
 #
