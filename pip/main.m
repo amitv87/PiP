@@ -70,7 +70,7 @@ item.keyEquivalentModifierMask = mask; \
   ADD_ITEM_MASK(@"Zoom", performZoom:, @"z", NSEventModifierFlagCommand | NSEventModifierFlagOption);
   ADD_ITEM(@"Fullscreen", toggleFullScreen:, @"f");
   ADD_ITEM(@"Minimize", performMiniaturize:, @"m");
-//  ADD_ITEM(@"Always on top", toggleFloat, @"a");
+  ADD_ITEM(@"Always on top", toggleFloat, @"a");
   ADD_ITEM(@"Join all spaces", togglePin, @"j");
   ADD_ITEM(@"Bring All to Front", arrangeInFront:, @"");
   ADD_ITEM(@"Toggle Native PiP", toggleNativePip, @"p");

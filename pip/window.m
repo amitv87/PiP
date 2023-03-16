@@ -923,6 +923,8 @@ static NSImage* get_rel_image(NSImage* img){
   if(should_exclude_desktop_elements) win_option |= kCGWindowListExcludeDesktopElements;
   CFArrayRef all_windows = CGWindowListCopyWindowInfo(win_option, kCGNullWindowID);
 
+  int self_pid = [[NSProcessInfo processInfo] processIdentifier];
+
   for (CFIndex i = 0; i < CFArrayGetCount(all_windows); ++i) {
     CFDictionaryRef window_ref = (CFDictionaryRef)CFArrayGetValueAtIndex(all_windows, i);
 
@@ -942,6 +944,7 @@ static NSImage* get_rel_image(NSImage* img){
 
     id_ref = (CFNumberRef)CFDictionaryGetValue(window_ref, kCGWindowOwnerPID);
     CFNumberGetValue(id_ref, kCFNumberIntType, &ownerPid);
+    if(ownerPid == self_pid) continue;
 
     bool isFaulty = true;
     CFDictionaryRef bounds = (CFDictionaryRef)CFDictionaryGetValue (window_ref, kCGWindowBounds);
