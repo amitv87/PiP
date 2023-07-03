@@ -33,7 +33,7 @@ Now with AirPlay receiver support (if on macOS 12+, turn-off built-in AirPlay re
 
 ### Manual download
 
-[PiP-2.41.dmg](https://github.com/amitv87/PiP/releases/download/v2.41/PiP-2.41.dmg)
+[PiP-2.50.dmg](https://github.com/amitv87/PiP/releases/download/v2.50/PiP-2.50.dmg)
 
 ### Download and install via Homebrew
 
