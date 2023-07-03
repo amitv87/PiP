@@ -55,25 +55,22 @@ static CIContext* getCIContext(){
 @synthesize context;
 @synthesize delegate;
 
-- (instancetype)init{
+- (instancetype)init:(BOOL)hidpi{
   self = [super init];
   cropRect = CGRectZero;
   GLView *openGLView = [[GLView alloc] initWithFrame:CGRectZero pixelFormat:[NSOpenGLView defaultPixelFormat]];
   openGLView.renderDelegate = self;
   self.view = openGLView;
   self.view.openGLContext = getGLContext();
-  self.view.wantsBestResolutionOpenGLSurface = NO;
+  self.view.wantsBestResolutionOpenGLSurface = hidpi;
   self.context = getCIContext();
   return self;
 }
 
 - (void)setCropRect:(NSRect) rect{
   if(!self.image) return;
-  NSSize frameSize = self.view.frame.size;
-  NSSize imageSize = self.image.extent.size;
-  float scale = frameSize.width / imageSize.width;
-  rect = NSMakeRect(rect.origin.x / scale, rect.origin.y / scale, rect.size.width / scale, rect.size.height / scale);
-  cropRect = rect;
+  float scale = self.image.extent.size.width / self.view.frame.size.width;
+  cropRect = CGRectApplyAffineTransform(rect, CGAffineTransformMakeScale(scale, scale));
 }
 
 - (void)openGLView:(GLView *)view drawRect:(CGRect)rect {
@@ -81,7 +78,11 @@ static CIContext* getCIContext(){
 
   NSSize frameSize = self.view.frame.size;
   NSSize targetSize = frameSize;
-  NSSize imageSize = cropRect.size.width * cropRect.size.height == 0 ? self.image.extent.size : cropRect.size;
+  float hidpi_scale = self.view.wantsBestResolutionOpenGLSurface ? self.view.window.backingScaleFactor : 1;
+
+  NSSize imageSize = CGSizeZero;
+  if(cropRect.size.width * cropRect.size.height != 0) imageSize = CGSizeApplyAffineTransform(cropRect.size, CGAffineTransformMakeScale(1.0/hidpi_scale, 1.0/hidpi_scale));
+  else imageSize = CGSizeApplyAffineTransform(self.image.extent.size, CGAffineTransformMakeScale(1.0/hidpi_scale, 1.0/hidpi_scale));
 
   NSSize availSize = self.view.window.screen.visibleFrame.size;
   float frameAspectRatio = frameSize.width / frameSize.height;
@@ -106,15 +107,14 @@ static CIContext* getCIContext(){
 
   if(arr < 0.99 || arr > 1.01) [self.delegate onResize:targetSize andAspectRatio:targetSize];
 
-  NSRect fromRect = cropRect.size.width * cropRect.size.height == 0 ? self.image.extent : cropRect;
+  NSRect fromRect = cropRect.size.width * cropRect.size.height == 0 ? (NSRect){.size = self.image.extent.size} : cropRect;
 
-  NSRect inRect = CGRectZero;
-  inRect.size = targetSize;
+  NSRect inRect = {.size = targetSize};
 
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
 
-  glViewport(0, 0, targetSize.width, targetSize.height);
+  glViewport(0, 0, targetSize.width * hidpi_scale, targetSize.height * hidpi_scale);
   glOrtho(0, targetSize.width, 0, targetSize.height, -1, 1);
 
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

@@ -28,7 +28,7 @@
 @synthesize context;
 @synthesize delegate;
 
-- (instancetype)init{
+- (instancetype)init:(BOOL)hidpi{
   self = [super init];
   self.image = nil;
   self.device = MTLCreateSystemDefaultDevice();
@@ -36,10 +36,11 @@
   self.view.clearColor = MTLClearColorMake(0, 0, 0, 0);
   self.view.delegate = self;
   self.view.framebufferOnly = NO;
-  self.view.autoResizeDrawable = YES;
+  self.view.autoResizeDrawable = true;
   self.view.enableSetNeedsDisplay = YES;
+  self.view.wantsBestResolutionOpenGLSurface = hidpi;
   colorspace = CGColorSpaceCreateDeviceRGB();
-  self.context = [CIContext contextWithMTLDevice:self.device options:@{kCIContextWorkingColorSpace: (__bridge id)colorspace}];
+  self.context = [CIContext contextWithMTLDevice:self.device options:@{kCIContextWorkingColorSpace: (__bridge id)colorspace,}];
   self.commandQueue = [self.device newCommandQueue];
 
   imageScale = 0;
@@ -53,18 +54,8 @@
 
 - (void)setCropRect:(NSRect) rect{
   if(!self.image) return;
-  NSSize frameSize = self.view.frame.size;
-  NSSize imageSize = self.image.extent.size;
-  float scale = frameSize.width / imageSize.width;
-
-  if(rect.size.width * rect.size.height <= 1) goto end;
-  rect = NSMakeRect(rect.origin.x / scale, rect.origin.y / scale, rect.size.width / scale, rect.size.height / scale);
-  if(rect.size.width * rect.size.height <= 1) goto end;
-  cropRect = rect;
-  return;
-
-  end:
-  cropRect = CGRectZero;
+  float scale = self.image.extent.size.width / self.view.frame.size.width;
+  cropRect = CGRectApplyAffineTransform(rect, CGAffineTransformMakeScale(scale, scale));
 }
 
 - (void)drawInMTKView:(MTKView *)view {
@@ -74,10 +65,14 @@
 
   CIImage* image = self.image;
 
-  if(cropRect.size.width * cropRect.size.height != 0) image = [image imageByCroppingToRect:cropRect];
-
+  NSRect bounds = {.size = image.extent.size};
   NSSize frameSize = self.view.frame.size;
-  NSSize imageSize = image.extent.size;
+  float hidpi_scale = self.view.wantsBestResolutionOpenGLSurface ? self.view.window.backingScaleFactor : 1;
+
+  if(cropRect.size.width * cropRect.size.height != 0) bounds = cropRect;
+  bounds = CGRectApplyAffineTransform(bounds, CGAffineTransformMakeScale(1.0/hidpi_scale, 1.0/hidpi_scale));
+
+  NSSize imageSize = bounds.size;
 
   NSSize availSize = self.view.window.screen.visibleFrame.size;
   float frameAspectRatio = frameSize.width / frameSize.height;
@@ -103,12 +98,19 @@
 
   if(arr < 0.99 || arr > 1.01) [self.delegate onResize:targetSize andAspectRatio:targetSize];
 
-  float scale = targetSize.width / imageSize.width;
-  image = (scale < 0.99 || scale > 1.01) ? [image imageByApplyingTransform:CGAffineTransformMakeScale(scale, scale)] : image;
+  float scale = targetSize.width / (imageSize.width / hidpi_scale);
 
-  self.view.drawableSize = targetSize;
+  self.view.drawableSize = CGSizeApplyAffineTransform(bounds.size, CGAffineTransformMakeScale(hidpi_scale, hidpi_scale));
+  bounds = CGRectApplyAffineTransform(bounds, CGAffineTransformMakeScale(scale, scale));
+
+  // if(targetSize.width < imageSize.width){
+    scale /= hidpi_scale;
+    image = [image imageByApplyingTransform:CGAffineTransformMakeScale(scale, scale)];
+    self.view.drawableSize = bounds.size;
+  // }
+
   id<MTLCommandBuffer> commandBuffer = [self.commandQueue commandBuffer];
-  [self.context render:image toMTLTexture:outputTexture commandBuffer:commandBuffer bounds:image.extent colorSpace:colorspace];
+  [self.context render:image toMTLTexture:outputTexture commandBuffer:commandBuffer bounds:bounds colorSpace:colorspace];
   [commandBuffer presentDrawable:self.view.currentDrawable];
   [commandBuffer commit];
 }

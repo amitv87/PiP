@@ -211,10 +211,13 @@ static void request_permission(const char* perm_string){
   [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:[NSString stringWithFormat:@"x-apple.systempreferences:com.apple.preference.security?Privacy_%s", perm_string]]];
 }
 
-static CGImageRef CaptureWindow(CGWindowID wid){
+static CGImageRef CaptureWindow(CGWindowID wid, bool hidpi){
   CGImageRef window_image = NULL;
   CFArrayRef window_image_arr = NULL;
-  window_image_arr = CGSHWCaptureWindowList(CGSMainConnectionID(), &wid, 1, kCGSCaptureIgnoreGlobalClipShape | kCGSWindowCaptureNominalResolution);
+  window_image_arr = CGSHWCaptureWindowList(CGSMainConnectionID(), &wid, 1, 0
+    | kCGSCaptureIgnoreGlobalClipShape
+    | (hidpi ? 0 : kCGSWindowCaptureNominalResolution)
+  );
   if(window_image_arr) window_image = (CGImageRef)CFArrayGetValueAtIndex(window_image_arr, 0);
   if(!window_image) window_image = CGWindowListCreateImage(CGRectNull, kCGWindowListOptionIncludingWindow, wid, kCGWindowImageNominalResolution | kCGWindowImageBoundsIgnoreFraming);
   return window_image;
@@ -398,6 +401,7 @@ static NSImage* get_rel_image(NSImage* img){
   VButton* playbutt;
   float contentAR;
   int refreshRate;
+  bool is_hidpi;
   bool shouldClose;
   bool isWinClosing;
   bool isPipCLosing;
@@ -441,6 +445,7 @@ static NSImage* get_rel_image(NSImage* img){
   display_stream = NULL;
 
   shouldEnableFullScreen = is_playing = is_airplay_session = enable;
+  is_hidpi = [(NSNumber*)getPref(@"hidpi") intValue] > 0 && !is_airplay_session;
 
   self = [super initWithContentRect:kStartRect styleMask:kWindowMask backing:NSBackingStoreBuffered defer:YES];
 
@@ -502,7 +507,7 @@ static NSImage* get_rel_image(NSImage* img){
   rootView.autoresizingMask = NSViewHeightSizable | NSViewWidthSizable | NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin | NSViewMaxYMargin;
 
   imageView = [[ImageView alloc] initWithFrame:kStartRect];
-  imageView.renderer = [(NSNumber*)getPref(@"renderer") intValue] == DisplayRendererTypeOpenGL ? [[OpenGLRenderer alloc] init] : [[MetalRenderer alloc] init];
+  imageView.renderer = [(NSNumber*)getPref(@"renderer") intValue] == DisplayRendererTypeOpenGL ? [[OpenGLRenderer alloc] init:is_hidpi] : [[MetalRenderer alloc] init:is_hidpi];
   imageView.renderer.delegate = self;
   imageView.hidden = !is_airplay_session;
 
@@ -817,7 +822,7 @@ static NSImage* get_rel_image(NSImage* img){
 }
 
 - (void)capture{
-  CGImageRef window_image = window_id >= 0 ? CaptureWindow(window_id) : (display_id >= 0 ? CGDisplayCreateImage(display_id) : NULL);
+  CGImageRef window_image = window_id >= 0 ? CaptureWindow(window_id, is_hidpi) : (display_id >= 0 ? CGDisplayCreateImage(display_id) : NULL);
   if(window_image != NULL){
     CIImage* ciimage = [CIImage imageWithCGImage:window_image];
     CGRect imageRect = [ciimage extent];
@@ -962,7 +967,7 @@ static NSImage* get_rel_image(NSImage* img){
       }
     }
     else{
-      CGImageRef window_image = CaptureWindow(windowId);
+      CGImageRef window_image = CaptureWindow(windowId, false);
       if(window_image == NULL) continue;
       isFaulty = CGImageGetHeight(window_image) * CGImageGetWidth(window_image) <= 1;
       CGImageRelease(window_image);
@@ -1101,6 +1106,7 @@ end:
   else if(display_id >= 0){
     size_t width = CGDisplayPixelsWide(display_id);
     size_t height = CGDisplayPixelsHigh(display_id);
+    if(is_hidpi) width *= self.backingScaleFactor, height *= self.backingScaleFactor;
 
     NSDictionary* opts = @{
       (__bridge NSString *)kCGDisplayStreamMinimumFrameTime : @(1.0f / refreshRate),

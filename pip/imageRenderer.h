@@ -19,7 +19,7 @@
 @property (nonatomic,strong) CIContext *context;
 @property (nonatomic,strong,readonly) NSView *view;
 @property (nonatomic,strong) id<ImageRendererDelegate> delegate;
-- (instancetype)init;
+- (instancetype)init:(BOOL)hidpi;
 - (NSRect)cropRect;
 - (void)setScale:(float) scale;
 - (void)setCropRect:(NSRect) rect;

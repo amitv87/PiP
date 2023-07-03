@@ -23,6 +23,7 @@ typedef enum{
 
 static NSArray* getPrefsArray(void){
   return @[
+    OPTION(hidpi, "Use HiDPI mode", CheckBox, [NSNull null], @0, @"on supported displays"),
     OPTION(renderer, "Display Renderer", Select, (@[@"Metal", @"Opengl"]), [NSNumber numberWithInt:DisplayRendererTypeOpenGL], [NSNull null]),
     #ifndef NO_AIRPLAY
     OPTION(airplay, "AirPlay Receiver", CheckBox, [NSNull null], @1, @"Use PiP as Airplay receiver"),
@@ -60,7 +61,7 @@ NSObject* getPref(NSString* key){
 
 -(id)init{
   self = [super
-          initWithContentRect:NSMakeRect(0, 0, 450, 200)
+          initWithContentRect:NSMakeRect(0, 0, 450, 210)
           styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskNonactivatingPanel
           backing:NSBackingStoreBuffered defer:YES
   ];
