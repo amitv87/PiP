@@ -8,7 +8,7 @@ Now with AirPlay receiver support (if on macOS 12+, turn-off built-in AirPlay re
 
 ## Code Info
 * Nibless cocoa app
-* OpenGL/Metal renderer
+* OpenGL/Metal renderer with HiDPI support
 * CoreGraphics based capturer (looking for alternative)
 * No third party dependency
 * Uses private framework for native pip support
