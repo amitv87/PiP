@@ -858,6 +858,7 @@ static NSImage* get_rel_image(NSImage* img){
 
 - (void)onDoubleClick:(NSEvent *)theEvent{
   if(window_id < 0) return;
+  if(@available(macOS 14.0, *)) return;
   bringWindoToForeground(window_id);
   if(@available(macOS 11.0, *)){
     if(!AXIsProcessTrusted()) request_permission("Accessibility");
