@@ -235,11 +235,17 @@ void airplay_receiver_start(void){
   };
 
   NSSize size = [[NSScreen mainScreen] frame].size;
-//  NSLog(@"screen res: %@", NSStringFromSize(size));
+  float scale = [NSScreen mainScreen].backingScaleFactor;
+
+  NSNumberFormatter* f = [[NSNumberFormatter alloc] init];
+  f.numberStyle = NSNumberFormatterDecimalStyle;
+  NSNumber* ns_scale = [f numberFromString:(NSString*)getPrefOption(@"airplay_scale_factor")];
+  if(ns_scale) scale = [ns_scale floatValue];
+  // NSLog(@"screen res: %@, scale: %f", NSStringFromSize(size), scale);
 
   raop = raop_init(MAX_ACTIVE_SESSIONS * 2, &raop_cbs);
-  raop_set_plist(raop, "width", size.width);
-  raop_set_plist(raop, "height", size.height);
+  raop_set_plist(raop, "width", size.width * scale);
+  raop_set_plist(raop, "height", size.height * scale);
   raop_set_plist(raop, "refreshRate", 60);
   raop_set_plist(raop, "maxFPS", 60);
   raop_set_plist(raop, "overscanned", 0);

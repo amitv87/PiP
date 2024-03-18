@@ -27,6 +27,7 @@ static NSArray* getPrefsArray(void){
     OPTION(renderer, "Display Renderer", Select, (@[@"Metal", @"Opengl"]), [NSNumber numberWithInt:DisplayRendererTypeOpenGL], [NSNull null]),
     #ifndef NO_AIRPLAY
     OPTION(airplay, "AirPlay Receiver", CheckBox, [NSNull null], @1, @"Use PiP as Airplay receiver"),
+    OPTION(airplay_scale_factor, "AirPlay Scale factor", Select, (@[@"1.00", @"2.00", @"3.00", @"Default"]), @3, [NSNull null]),
     #endif
     OPTION(wfilter_null_title, "Exclude windows", CheckBox, [NSNull null], @0, @"when title is null"),
     OPTION(wfilter_epmty_title, "Exclude windows", CheckBox, [NSNull null], @0, @"when title is empty"),
@@ -54,6 +55,11 @@ NSObject* getPref(NSString* key){
   return val;
 }
 
+NSObject* getPrefOption(NSString* key){
+  NSArray* options = getDefaultPrefs()[key][@"options"];
+  return [options objectAtIndex:[(NSNumber*)getPref(key) intValue]];
+}
+
 @implementation Preferences{
   NSViewController* nvc;
   NSArray* opts;
@@ -61,7 +67,7 @@ NSObject* getPref(NSString* key){
 
 -(id)init{
   self = [super
-          initWithContentRect:NSMakeRect(0, 0, 450, 210)
+          initWithContentRect:NSMakeRect(0, 0, 450, 230)
           styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskNonactivatingPanel
           backing:NSBackingStoreBuffered defer:YES
   ];
