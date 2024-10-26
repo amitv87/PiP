@@ -1,10 +1,11 @@
 # macOS Picture in Picture
 
-Always on top window preview similar to the popular windows only OnTopReplica
+<a href="https://github.com/amitv87/PiP/releases/latest"><img src="https://img.shields.io/github/downloads/amitv87/PiP/total" alt="Total Downloads"></a>
+<a href="https://github.com/amitv87/PiP/releases/latest"><img src="https://img.shields.io/github/v/tag/amitv87/PiP" alt="App Version"></a>
+<a href=""><img src="https://img.shields.io/github/repo-size/amitv87/PiP" alt="Repo Size"></a>
+<a href="https://github.com/amitv87/PiP/stargazers"><img src="https://img.shields.io/github/stars/amitv87/PiP" alt="Repo Stars"></a>
 
-Now with AirPlay receiver support (if on macOS 12+, turn-off built-in AirPlay receiver from system preferences)
-
-[![PiP demo](https://img.youtube.com/vi/MDte5sZCRnY/0.jpg)](https://www.youtube.com/watch?v=MDte5sZCRnY)
+Always on top window preview with AirPlay receiver support (if on macOS 12+, turn-off built-in AirPlay receiver from system preferences)
 
 ## Code Info
 * Nibless cocoa app
@@ -26,23 +27,18 @@ Now with AirPlay receiver support (if on macOS 12+, turn-off built-in AirPlay re
 * Minimal modern UI
 * Upto 10 parallel airplay sessions (soft limit)
 
-## To do
-* Almost all the missing features when compared to [OnTopReplica](https://github.com/LorenzCK/OnTopReplica)
-
 ## Installation
 
 ### Manual download
-
-[PiP-2.70.dmg](https://github.com/amitv87/PiP/releases/download/v2.70/PiP-2.70.dmg)
+<a href="http://github.com/amitv87/PiP/releases/latest"><img src="https://img.shields.io/github/v/tag/amitv87/PiP?sort=date" alt="Latest Release"></a> <a href="http://github.com/amitv87/PiP/releases/latest"><img src="https://img.shields.io/github/downloads/amitv87/pip/latest/total" alt="Latest Release"></a>
 
 ### Download and install via Homebrew
-
+<a href="https://formulae.brew.sh/cask/amitv87-pip"><img src="https://img.shields.io/homebrew/cask/installs/dm/amitv87-pip" alt="Homebrew"></a>
 ```
 brew install --cask amitv87-pip
 ```
 
 ### Build from source and run
-
 ```
 # checkout code
 git clone https://github.com/amitv87/PiP.git
