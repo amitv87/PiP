@@ -51,3 +51,17 @@ open build/Release/PiP.app
 # or simply
 ./run.sh
 ```
+
+## Important Notice for macOS Sequoia Users
+
+With the release of macOS Sequoia, Apple has introduced stricter security measures that affect how unsigned apps are handled. If you encounter issues running PiP on macOS Sequoia, follow these steps to allow the app to run:
+
+1. **Attempt to Open the App**: Double-click the PiP app. You may receive a warning that the app cannot be verified.
+2. **Open Privacy & Security Settings**: Go to the Settings app, click on Privacy & Security.
+3. **Scroll to Security Section**: Scroll down to the Security section at the very bottom.
+4. **Allow the App**: You will see a note that reads "PiP was blocked to protect your Mac." Click the "Open Anyway" button.
+5. **Authenticate**: You may need to authenticate with an admin account to confirm your choice.
+
+For more details on these changes, you can refer to the [macOS Sequoia review](https://sixcolors.com/post/2024/09/macos-sequoia-review/#:~:text=Open%2520the%2520Settings%2520app%252C%2520click%2520on%2520Privacy%2520&%2520Security%252C%2520scroll%2520all%2520the%2520way%2520down%2520to%2520the%2520Security%2520section%2520at%2520the%2520very%2520bottom%252C%2520and%2520you%E2%80%99ll%2520see%2520a%2520note%2520that%2520reads%2520%E2%80%9C%5BApp%5D%2520was%2520blocked%2520to%2520protect%2520your%2520Mac.%E2%80%9D%2520There%E2%80%99s%2520an%2520Open%2520Anyway%2520button%2520here%2520you%2520can%2520click).
+
+These steps are necessary due to Apple's increased focus on security, which requires additional user actions to run apps that are not notarized by Apple.
