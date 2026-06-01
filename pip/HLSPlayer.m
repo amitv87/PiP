@@ -33,6 +33,8 @@
 
     _playerItem = [AVPlayerItem playerItemWithAsset:asset];
     _player = [AVPlayer playerWithPlayerItem:_playerItem];
+    _player.automaticallyWaitsToMinimizeStalling = NO;
+    _playerItem.preferredForwardBufferDuration = 1.0;
 
     // Setup video output for frame extraction
     NSDictionary *pixBuffAttributes = @{

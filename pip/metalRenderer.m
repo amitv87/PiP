@@ -31,7 +31,7 @@
 - (instancetype)init:(BOOL)hidpi{
   self = [super init];
   self.image = nil;
-  self.device = MTLCreateSystemDefaultDevice();
+  self.device = getSharedMTLDevice();
   self.view = [[MTKView alloc] initWithFrame:CGRectZero device:self.device];
   self.view.clearColor = MTLClearColorMake(0, 0, 0, 0);
   self.view.delegate = self;

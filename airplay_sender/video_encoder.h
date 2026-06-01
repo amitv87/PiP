@@ -61,6 +61,13 @@ video_encoder_t *video_encoder_init(int width, int height, int fps, int bitrate)
 void video_encoder_set_callback(video_encoder_t *enc, encoded_frame_callback_t cb, void *ctx);
 
 /**
+ * Set maximum keyframe interval in frames.
+ * Example: at 30fps, 30 => ~1 second keyframe cadence.
+ * Returns 0 on success, -1 on error.
+ */
+int video_encoder_set_keyframe_interval(video_encoder_t *enc, int keyframe_interval_frames);
+
+/**
  * Encode a frame
  * rgba_data: RGBA32 format frame data (row-major)
  * stride: Bytes per row (may be larger than width * 4 for alignment)

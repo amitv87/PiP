@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PiP Stream</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #fff;
+        }
+        #container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
+        #waiting {
+            position: absolute;
+            text-align: center;
+            color: #888;
+        }
+        #waiting h2 { font-weight: 400; font-size: 1.2em; margin-bottom: 8px; }
+        #waiting p { font-size: 0.9em; color: #555; }
+        #status {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 8px 16px;
+            background: rgba(0, 0, 0, 0.6);
+            font-size: 0.85em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: opacity 0.4s;
+        }
+        #dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #888;
+            transition: background 0.4s;
+        }
+        #dot.live { background: #e53935; }
+        #dot.connecting { background: #fb8c00; }
+        #dot.error { background: #888; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <video id="video" autoplay muted playsinline controls></video>
+        <div id="waiting">
+            <h2>Transmisi&oacute;n en vivo</h2>
+            <p id="waitMsg">Cargando...</p>
+        </div>
+        <div id="status">
+            <span id="dot"></span>
+            <span id="statusText">Cargando...</span>
+        </div>
+    </div>
+
+    <script src="hls.min.js"></script>
+    <script>
+        // DOM references
+        var video = document.getElementById("video");
+        var waiting = document.getElementById("waiting");
+        var dot = document.getElementById("dot");
+        var statusText = document.getElementById("statusText");
+        var waitMsg = document.getElementById("waitMsg");
+        var streamUrl = "stream.m3u8";
+        var retryTimer = null;
+        var RETRY_DELAY = 4000;
+
+        /**
+         * Update the status bar text and indicator dot.
+         * @param {string} text - Status message to display
+         * @param {string} state - One of "live", "connecting", "error"
+         */
+        function setStatus(text, state) {
+            statusText.textContent = text;
+            dot.className = state;
+        }
+
+        /**
+         * Show or hide the waiting overlay.
+         * @param {boolean} show - Whether to display the overlay
+         * @param {string} [msg] - Optional message for the overlay
+         */
+        function showWaiting(show, msg) {
+            waiting.style.display = show ? "block" : "none";
+            if (msg) waitMsg.textContent = msg;
+        }
+
+        /**
+         * Schedule a reconnection attempt after RETRY_DELAY ms.
+         */
+        function scheduleRetry() {
+            if (retryTimer) return;
+            setStatus("Reconectando...", "connecting");
+            showWaiting(true, "Reconectando...");
+            retryTimer = setTimeout(function() {
+                retryTimer = null;
+                initPlayer();
+            }, RETRY_DELAY);
+        }
+
+        /**
+         * Initialize the HLS player using native support or hls.js.
+         */
+        function initPlayer() {
+            setStatus("Cargando...", "connecting");
+            showWaiting(true, "Cargando...");
+            console.log("[PiP] initPlayer: starting");
+
+            // Safari and iOS: native HLS support
+            if (video.canPlayType("application/vnd.apple.mpegurl")) {
+                console.log("[PiP] Using native HLS support");
+                video.src = streamUrl;
+                video.addEventListener("loadeddata", function onLoad() {
+                    video.removeEventListener("loadeddata", onLoad);
+                    console.log("[PiP] Native HLS: loadeddata fired");
+                    setStatus("Conectado", "live");
+                    showWaiting(false);
+                });
+                video.addEventListener("canplay", function() {
+                    console.log("[PiP] Native HLS: canplay fired");
+                    setStatus("Conectado", "live");
+                    showWaiting(false);
+                });
+                video.addEventListener("error", function() {
+                    var err = video.error;
+                    console.error("[PiP] Native HLS error:", err ? err.code + " " + err.message : "unknown");
+                    scheduleRetry();
+                });
+                return;
+            } // End of native HLS branch
+
+            // Other browsers: use hls.js
+            if (typeof Hls !== "undefined" && Hls.isSupported()) {
+                console.log("[PiP] Using hls.js");
+                var hls = new Hls({
+                    lowLatencyMode: true,
+                    liveSyncDuration: 2,
+                    liveMaxLatencyDuration: 3.5,
+                    maxBufferLength: 4,
+                    backBufferLength: 8,
+                    maxLiveSyncPlaybackRate: 1.25,
+                    enableWorker: true,
+                    debug: false
+                });
+                hls.loadSource(streamUrl);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    console.log("[PiP] hls.js: MANIFEST_PARSED");
+                    setStatus("Conectado", "live");
+                    showWaiting(false);
+                    video.play().catch(function(e) {
+                        console.warn("[PiP] hls.js: play() rejected:", e);
+                    });
+                });
+                hls.on(Hls.Events.ERROR, function(event, data) {
+                    console.warn("[PiP] hls.js error:", data.type, data.details, "fatal:", data.fatal);
+                    if (data.fatal) {
+                        hls.destroy();
+                        scheduleRetry();
+                    }
+                });
+                hls.on(Hls.Events.FRAG_LOADED, function() {
+                    console.log("[PiP] hls.js: fragment loaded");
+                });
+                return;
+            } // End of hls.js branch
+
+            // No HLS support at all
+            console.error("[PiP] No HLS support detected");
+            setStatus("Error de conexi\u00f3n", "error");
+            showWaiting(true, "Navegador no compatible");
+        } // End of function initPlayer()
+
+        initPlayer();
+    </script>
+</body>
+</html>

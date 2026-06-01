@@ -147,6 +147,10 @@
 		55FEB9A7 /* airplaySender.m in Sources */ = {isa = PBXBuildFile; fileRef = 55FEB9A2 /* airplaySender.m */; };
 		55FEB9A8 /* frame_capture.m in Sources */ = {isa = PBXBuildFile; fileRef = 55FEB9A4 /* frame_capture.m */; };
 		55FEB9A9 /* video_encoder.m in Sources */ = {isa = PBXBuildFile; fileRef = 55FEB9A6 /* video_encoder.m */; };
+		55FEBC11 /* ts_muxer.c in Sources */ = {isa = PBXBuildFile; fileRef = 55FEBC02 /* ts_muxer.c */; };
+		55FEBC12 /* hls_writer.c in Sources */ = {isa = PBXBuildFile; fileRef = 55FEBC04 /* hls_writer.c */; };
+		55FEBC13 /* stream_server.m in Sources */ = {isa = PBXBuildFile; fileRef = 55FEBC06 /* stream_server.m */; };
+		55FEBC14 /* stream_manager.m in Sources */ = {isa = PBXBuildFile; fileRef = 55FEBC08 /* stream_manager.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -325,6 +329,17 @@
 		55FEB9A5 /* video_encoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = video_encoder.h; sourceTree = "<group>"; };
 		55FEB9A6 /* video_encoder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = video_encoder.m; sourceTree = "<group>"; };
 		55FEB9AA /* ScreenCaptureKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ScreenCaptureKit.framework; path = /System/Volumes/Data/Library/Developer/CommandLineTools/SDKs/MacOSX12.3.sdk/System/Library/Frameworks/ScreenCaptureKit.framework; sourceTree = "<group>"; };
+		55FEBC01 /* ts_muxer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ts_muxer.h; sourceTree = "<group>"; };
+		55FEBC02 /* ts_muxer.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ts_muxer.c; sourceTree = "<group>"; };
+		55FEBC03 /* hls_writer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = hls_writer.h; sourceTree = "<group>"; };
+		55FEBC04 /* hls_writer.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = hls_writer.c; sourceTree = "<group>"; };
+		55FEBC05 /* stream_server.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = stream_server.h; sourceTree = "<group>"; };
+		55FEBC06 /* stream_server.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = stream_server.m; sourceTree = "<group>"; };
+		55FEBC07 /* stream_manager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = stream_manager.h; sourceTree = "<group>"; };
+		55FEBC08 /* stream_manager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = stream_manager.m; sourceTree = "<group>"; };
+		55FEBC09 /* viewer.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = viewer.html; sourceTree = "<group>"; };
+		55FEBC0A /* hls.min.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "hls.min.js"; sourceTree = "<group>"; };
+		55FEBC0B /* incbin.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = incbin.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -576,6 +591,17 @@
 				55FEB9A4 /* frame_capture.m */,
 				55FEB9A5 /* video_encoder.h */,
 				55FEB9A6 /* video_encoder.m */,
+				55FEBC01 /* ts_muxer.h */,
+				55FEBC02 /* ts_muxer.c */,
+				55FEBC03 /* hls_writer.h */,
+				55FEBC04 /* hls_writer.c */,
+				55FEBC05 /* stream_server.h */,
+				55FEBC06 /* stream_server.m */,
+				55FEBC07 /* stream_manager.h */,
+				55FEBC08 /* stream_manager.m */,
+				55FEBC09 /* viewer.html */,
+				55FEBC0A /* hls.min.js */,
+				55FEBC0B /* incbin.h */,
 			);
 			path = pip;
 			sourceTree = "<group>";
@@ -807,6 +833,10 @@
 				55FEB9A7 /* airplaySender.m in Sources */,
 				55FEB9A8 /* frame_capture.m in Sources */,
 				55FEB9A9 /* video_encoder.m in Sources */,
+				55FEBC11 /* ts_muxer.c in Sources */,
+				55FEBC12 /* hls_writer.c in Sources */,
+				55FEBC13 /* stream_server.m in Sources */,
+				55FEBC14 /* stream_manager.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

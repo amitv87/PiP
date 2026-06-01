@@ -18,5 +18,7 @@
 	<string>True</string>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs access to your camera to capture video</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs access to your microphone to capture audio from your camera</string>
 </dict>
 </plist>

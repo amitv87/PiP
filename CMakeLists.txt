@@ -7,14 +7,14 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET 11.0)
 
 project(PiP)
 
-add_compile_options(-fobjc-arc -Wno-deprecated-declarations -Wno-format)
+add_compile_options(-fobjc-arc -Wno-deprecated-declarations -Wno-format -mmacosx-version-min=14.0)
 
 set(frameworks AVFoundation Cocoa VideoToolbox AudioToolbox CoreMedia QuartzCore OpenGL Metal MetalKit PIP SkyLight ScreenCaptureKit)
 list(TRANSFORM frameworks PREPEND "-framework ")
 
 set(AIRPLAY_SUPPORT_ENABLED 1)
 
-file(GLOB_RECURSE pip_src CONFIGURE_DEPENDS "pip/*.m")
+file(GLOB_RECURSE pip_src CONFIGURE_DEPENDS "pip/*.m" "pip/*.c")
 add_executable(pip ${pip_src})
 target_include_directories(pip PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}

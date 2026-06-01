@@ -45,6 +45,14 @@ video_encoder_set_callback(video_encoder_t *enc, encoded_frame_callback_t cb, vo
 }
 
 int
+video_encoder_set_keyframe_interval(video_encoder_t *enc, int keyframe_interval_frames)
+{
+  (void)enc;
+  (void)keyframe_interval_frames;
+  return 0;
+}
+
+int
 video_encoder_encode_frame(video_encoder_t *enc, uint8_t *rgba_data, int stride, uint64_t pts)
 {
   // Stub - does nothing

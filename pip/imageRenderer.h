@@ -10,6 +10,9 @@
 #define imageRenderer_h
 
 #import <Cocoa/Cocoa.h>
+#import <Metal/Metal.h>
+
+id<MTLDevice> getSharedMTLDevice(void);
 
 @protocol ImageRendererDelegate <NSObject>
 - (void)onResize:(CGSize)size andAspectRatio:(CGSize) ar;

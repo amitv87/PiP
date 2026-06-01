@@ -186,6 +186,41 @@ static void compression_output_callback(void *outputCallbackRefCon,
   enc->frame_count++;
 }
 
+int
+video_encoder_set_keyframe_interval(video_encoder_t *enc, int keyframe_interval_frames)
+{
+  if (!enc || !enc->compression_session || keyframe_interval_frames <= 0) {
+    return -1;
+  }
+
+  CFNumberRef keyframe_interval_num = CFNumberCreate(NULL, kCFNumberIntType, &keyframe_interval_frames);
+  if (!keyframe_interval_num) {
+    return -1;
+  }
+
+  OSStatus status = VTSessionSetProperty(enc->compression_session,
+                                         kVTCompressionPropertyKey_MaxKeyFrameInterval,
+                                         keyframe_interval_num);
+  CFRelease(keyframe_interval_num);
+  if (status != noErr) {
+    NSLog(@"video_encoder: failed to set MaxKeyFrameInterval: %d", (int)status);
+    return -1;
+  }
+
+  if (enc->fps > 0) {
+    double interval_seconds = (double)keyframe_interval_frames / (double)enc->fps;
+    CFNumberRef keyframe_duration_num = CFNumberCreate(NULL, kCFNumberDoubleType, &interval_seconds);
+    if (keyframe_duration_num) {
+      VTSessionSetProperty(enc->compression_session,
+                           kVTCompressionPropertyKey_MaxKeyFrameIntervalDuration,
+                           keyframe_duration_num);
+      CFRelease(keyframe_duration_num);
+    }
+  }
+
+  return 0;
+}
+
 video_encoder_t *
 video_encoder_init(int width, int height, int fps, int bitrate)
 {
@@ -259,12 +294,11 @@ video_encoder_init(int width, int height, int fps, int bitrate)
   CFRelease(rate_limit_values[1]);
   CFRelease(data_rate_limits);
 
-  // Set keyframe interval (every 2 seconds at target fps)
-  // AirPlay typically uses 2-second keyframe intervals for better error recovery
+  // Default keyframe interval: every ~2 seconds.
+  // StreamManager may override this to 1 second for lower HLS latency.
   int keyframe_interval = fps * 2;
-  CFNumberRef keyframe_interval_num = CFNumberCreate(NULL, kCFNumberIntType, &keyframe_interval);
-  VTSessionSetProperty(enc->compression_session, kVTCompressionPropertyKey_MaxKeyFrameInterval, keyframe_interval_num);
-  CFRelease(keyframe_interval_num);
+  if (keyframe_interval < 1) keyframe_interval = 1;
+  video_encoder_set_keyframe_interval(enc, keyframe_interval);
 
   // Set expected frame rate
   CFNumberRef fps_num = CFNumberCreate(NULL, kCFNumberIntType, &fps);

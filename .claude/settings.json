@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(lsof:*)",
+      "Bash(log show:*)",
+      "Read(//Users/ccarpio/Library/Developer/Xcode/DerivedData/**)"
+    ]
+  }
+}

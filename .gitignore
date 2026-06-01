@@ -66,3 +66,7 @@ iOSInjectionProject/
 
 .DS_Store
 *.dmg
+
+# Agent instruction files (local only)
+CLAUDE.md
+AGENTS.md

@@ -96,17 +96,29 @@ static void capture_frame(frame_capture_t *cap) {
     return;
   }
 
-  // Get the current image from the renderer (must be on main thread)
-  // __block CIImage *currentImage = nil;
-  // if ([NSThread isMainThread]) {
-  //   currentImage = [imageView.renderer currentImage];
-  // } else {
-  //   dispatch_sync(dispatch_get_main_queue(), ^{
-  //     currentImage = [imageView.renderer currentImage];
-  //   });
-  // }
-
-  __block CIImage *currentImage = [imageView.renderer currentImage];
+  // Get the current image from the renderer on main thread.
+  // Use a bounded wait when called from the capture queue to avoid deadlock
+  // during shutdown (main thread stopping capture while capture queue requests main).
+  __block CIImage *currentImage = nil;
+  if ([NSThread isMainThread]) {
+    currentImage = [imageView.renderer currentImage];
+  } else {
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    dispatch_async(dispatch_get_main_queue(), ^{
+      currentImage = [imageView.renderer currentImage];
+      dispatch_semaphore_signal(sem);
+    });
+    long wait_result = dispatch_semaphore_wait(
+      sem,
+      dispatch_time(DISPATCH_TIME_NOW, (int64_t)(50 * NSEC_PER_MSEC))
+    );
+    if (wait_result != 0) {
+      if (cap->frame_count == 0 || cap->frame_count % 30 == 0) {
+        NSLog(@"frame_capture: timed out waiting for main-thread image (frame_count: %llu)", cap->frame_count);
+      }
+      return;
+    }
+  }
 
   if (!currentImage) {
     if (cap->frame_count == 0 || cap->frame_count % 30 == 0) {

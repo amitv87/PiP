@@ -18,8 +18,17 @@ typedef enum{
 NSObject* getPref(NSString* key);
 NSObject* getPrefOption(NSString* key);
 void setPref(NSString* key, NSObject* val);
+NSArray* getDisplayList(void);
+NSArray* getSourceList(void);
+NSDictionary* getDefaultSourcePreference(void);
+NSString* getDisplayNameForId(CGDirectDisplayID displayId);
+NSString* getCameraNameForId(NSString* cameraId);
+void setCustomDisplayName(CGDirectDisplayID displayId, NSString* name);
+void setCustomCameraName(NSString* cameraId, NSString* name);
+void showSourceNamesPanel(void);
+void showDisplayNamesPanel(void);
 
-@interface Preferences : NSPanel<NSWindowDelegate, NSTableViewDelegate, NSTableViewDataSource>
+@interface Preferences : NSPanel<NSWindowDelegate, NSTableViewDelegate, NSTableViewDataSource, NSTextFieldDelegate>
 
 @end
 

@@ -15,6 +15,7 @@
 #import "preferences.h"
 #import "selectionView.h"
 #import "HLSPlayer.h"
+#import "stream_manager.h"
 #ifndef NO_AIRPLAY
 #import "airplaySender.h"
 #endif
@@ -55,7 +56,7 @@
 - (void) setEnable:(bool) en;
 @end
 
-@interface Window : NSPanel<NSWindowDelegate, SelectionViewDelegate, ImageRendererDelegate, WindowDelegate, RootViewDelegate, ButtonDelegate, PIPViewControllerDelegate, HLSPlayerDelegate, AVCaptureVideoDataOutputSampleBufferDelegate
+@interface Window : NSPanel<NSWindowDelegate, SelectionViewDelegate, ImageRendererDelegate, WindowDelegate, RootViewDelegate, ButtonDelegate, PIPViewControllerDelegate, HLSPlayerDelegate, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate
 #ifndef NO_AIRPLAY
 , AirPlayDiscoveryDelegate
 #endif
@@ -71,5 +72,9 @@
 - (void) setVolume:(float)volume;
 - (void) setAudioInputFormat:(UInt32)format withsampleRate:(UInt32)sampleRate andChannels:(UInt32)channelCount andSPF:(UInt32)spf;
 - (void) loadHLSURL:(NSURL*)url;
+- (BOOL) cloneSourceToWindow:(Window*)target;
+- (NSString*) sourceType;
+- (NSString*) sourceStatus;
+- (void) startStreamAction:(id)sender;
 @end
 #endif /* Window_h */

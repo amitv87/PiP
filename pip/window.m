@@ -12,6 +12,7 @@
 #import "audioPlayer.h"
 #import "H264Decoder.h"
 #import "HLSPlayer.h"
+#import "stream_manager.h"
 #import <AVFoundation/AVFoundation.h>
 #import <CoreImage/CoreImage.h>
 #ifndef NO_AIRPLAY
@@ -420,6 +421,17 @@ static NSImage* hls_button_image(NSImage* img){
 }
 @end
 
+/**
+ * A view that passes through all mouse events to views behind it.
+ * Used for the source hint overlay so right-click menus still work.
+ */
+@interface PassthroughView : NSView
+@end
+
+@implementation PassthroughView
+- (NSView *)hitTest:(NSPoint)point { return nil; }
+@end
+
 @interface NSImage (ImageAdditions)
 +(NSImage *)swatchWithColor:(NSColor *)color size:(NSSize)size;
 @end
@@ -735,6 +747,28 @@ static NSImage* hls_button_image(NSImage* img){
 
 @end
 
+// Forward declaration for methods called from C callbacks
+@interface Window (DisconnectHandling)
+- (void)handleDisplayDisconnected:(CGDirectDisplayID)displayId;
+@end
+
+/**
+ * C callback for display reconfiguration events.
+ * Called when a display is added, removed, or reconfigured.
+ * The userInfo parameter is a pointer to the Window instance.
+ * @param display The display that was reconfigured
+ * @param flags The type of reconfiguration
+ * @param userInfo Pointer to the Window instance
+ */
+static void displayReconfigurationCallback(CGDirectDisplayID display, CGDisplayChangeSummaryFlags flags, void* userInfo){
+  if(flags & kCGDisplayRemoveFlag){
+    Window* window = (__bridge Window*)userInfo;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [window handleDisplayDisconnected:display];
+    });
+  }
+} // End of displayReconfigurationCallback()
+
 @implementation Window{
   NSTimer* timer;
   NSView* butCont;
@@ -783,6 +817,9 @@ static NSImage* hls_button_image(NSImage* img){
   NSTimer* mouse_timer;
   bool mouse_timer_rerun;
 
+  NSView* sourceHintOverlay;
+  NSTextField* hintLabel;
+
   NSString* airplay_title;
   bool was_floating;
   bool is_playing;
@@ -796,9 +833,17 @@ static NSImage* hls_button_image(NSImage* img){
   AVCaptureSession* camera_session;
   AVCaptureDeviceInput* camera_input;
   AVCaptureVideoDataOutput* camera_output;
+  AVCaptureAudioDataOutput* camera_audio_output;
   NSString* camera_id;
   AVCaptureDeviceFormat* camera_format;
   AVCaptureDevicePosition camera_position;
+  uint64_t camera_audio_sample_count;
+
+  // Camera audio capture and playback using AVCaptureAudioPreviewOutput
+  AVCaptureAudioPreviewOutput* camera_audio_preview;
+  bool camera_audio_enabled;
+  bool camera_audio_monitoring;  // Local audio monitoring (does not affect HLS streaming)
+  bool camera_has_microphone;
 #if __has_include(<ScreenCaptureKit/ScreenCaptureKit.h>)
   SCStream *window_stream API_AVAILABLE(macos(12.3));
   SCStreamConfiguration *window_stream_config API_AVAILABLE(macos(12.3));
@@ -813,6 +858,7 @@ static NSImage* hls_button_image(NSImage* img){
   bool is_airplay_sending;
   dispatch_queue_t senderQueue;  // Serial queue for sender operations
 #endif
+  StreamManager* streamManager;
 }
 
 - (id) initWithAirplay:(bool)enable andTitle:(NSString*)title{
@@ -831,8 +877,16 @@ static NSImage* hls_button_image(NSImage* img){
   camera_session = nil;
   camera_input = nil;
   camera_output = nil;
+  camera_audio_output = nil;
   camera_id = nil;
   camera_format = nil;
+  camera_audio_sample_count = 0;
+
+  // Initialize camera audio variables
+  camera_audio_preview = nil;
+  camera_audio_enabled = true;  // Enabled by default
+  camera_audio_monitoring = true;  // Local monitoring enabled by default
+  camera_has_microphone = false;
 #if __has_include(<ScreenCaptureKit/ScreenCaptureKit.h>)
   if (@available(macOS 12.3, *)) {
     window_stream = nil;
@@ -867,6 +921,7 @@ static NSImage* hls_button_image(NSImage* img){
   self.movable = YES;
   self.delegate = self;
   self.releasedWhenClosed = NO;
+  self.hidesOnDeactivate = NO;
   self.level = NSFloatingWindowLevel;
   self.movableByWindowBackground = YES;
   self.titlebarAppearsTransparent = true;
@@ -1038,6 +1093,32 @@ static NSImage* hls_button_image(NSImage* img){
   [[hlsButCont.widthAnchor constraintEqualToConstant:hlsButContRect.size.width] setActive:true];
   [[hlsButCont.centerXAnchor constraintEqualToAnchor:rootView.centerXAnchor constant:-hlsButContRect.origin.x] setActive:true];
 
+  // Create source hint overlay for blank windows
+  if(!is_airplay_session){
+    sourceHintOverlay = [[PassthroughView alloc] initWithFrame:kStartRect];
+    sourceHintOverlay.wantsLayer = YES;
+    sourceHintOverlay.layer.backgroundColor = [[NSColor colorWithWhite:0.0 alpha:0.6] CGColor];
+    sourceHintOverlay.layer.cornerRadius = 10;
+    sourceHintOverlay.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+
+    hintLabel = [[NSTextField alloc] init];
+    hintLabel.stringValue = @"Right-click to select source";
+    hintLabel.editable = NO;
+    hintLabel.selectable = NO;
+    hintLabel.bezeled = NO;
+    hintLabel.drawsBackground = NO;
+    hintLabel.textColor = [NSColor whiteColor];
+    hintLabel.font = [NSFont systemFontOfSize:14 weight:NSFontWeightMedium];
+    hintLabel.alignment = NSTextAlignmentCenter;
+    hintLabel.translatesAutoresizingMaskIntoConstraints = NO;
+
+    [sourceHintOverlay addSubview:hintLabel];
+    [sourceHintOverlay addConstraint:[NSLayoutConstraint constraintWithItem:hintLabel attribute:NSLayoutAttributeCenterX relatedBy:NSLayoutRelationEqual toItem:sourceHintOverlay attribute:NSLayoutAttributeCenterX multiplier:1 constant:0]];
+    [sourceHintOverlay addConstraint:[NSLayoutConstraint constraintWithItem:hintLabel attribute:NSLayoutAttributeCenterY relatedBy:NSLayoutRelationEqual toItem:sourceHintOverlay attribute:NSLayoutAttributeCenterY multiplier:1 constant:0]];
+
+    [rootView addSubview:sourceHintOverlay positioned:NSWindowAbove relativeTo:nil];
+  } // End of source hint overlay setup
+
   NSTrackingAreaOptions nstopts = NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways | NSTrackingInVisibleRect | NSTrackingAssumeInside;
   nstopts |= NSTrackingMouseMoved;
   NSTrackingArea *nstArea = [[NSTrackingArea alloc] initWithRect:[[self contentView] frame] options:nstopts owner:self userInfo:nil];
@@ -1059,6 +1140,45 @@ static NSImage* hls_button_image(NSImage* img){
   [self resetPlaybackSate];
 
   [self setupNonHLSControls];
+
+  if(!is_airplay_session){
+    NSDictionary* defaultSource = getDefaultSourcePreference();
+    NSString* sourceType = defaultSource[@"type"];
+    if([sourceType isEqualToString:@"display"]){
+      int defaultDisplayId = [defaultSource[@"id"] intValue];
+      if(defaultDisplayId > 0){
+        BOOL hasDisplay = NO;
+        NSArray* displays = getDisplayList();
+        for(NSDictionary* display in displays){
+          if([display[@"id"] intValue] == defaultDisplayId){
+            hasDisplay = YES;
+            break;
+          }
+        } // End of loop through displays
+        if(hasDisplay){
+          WindowSel* sel = [WindowSel getDefault];
+          sel.title = getDisplayNameForId(defaultDisplayId);
+          sel.dspId = defaultDisplayId;
+          NSMenuItem* item = [[NSMenuItem alloc] init];
+          [item setRepresentedObject:sel];
+          [self changeWindow:item];
+        }
+      }
+    } else if([sourceType isEqualToString:@"camera"]){
+      NSString* defaultCameraId = defaultSource[@"id"];
+      if(defaultCameraId && defaultCameraId.length > 0 && [AVCaptureDevice deviceWithUniqueID:defaultCameraId]){
+        WindowSel* sel = [WindowSel getDefault];
+        sel.title = getCameraNameForId(defaultCameraId);
+        sel.cameraId = defaultCameraId;
+        NSMenuItem* item = [[NSMenuItem alloc] init];
+        [item setRepresentedObject:sel];
+        [self changeWindow:item];
+      }
+    }
+  } // End of if not airplay session
+
+  // Register for display reconfiguration events (display disconnect)
+  CGDisplayRegisterReconfigurationCallback(displayReconfigurationCallback, (__bridge void*)self);
 
   return self;
 }
@@ -1734,8 +1854,7 @@ static NSImage* hls_button_image(NSImage* img){
 //    NSLog(@"%@", dict);
     CGDirectDisplayID did = [dict[@"NSScreenNumber"] intValue];
 
-    NSString* windowTitle = [NSString stringWithFormat:@"Display %u", did];
-    if (@available(macOS 10.15, *)) windowTitle = [NSString stringWithFormat:@"%@", [screen localizedName]];
+    NSString* windowTitle = getDisplayNameForId(did);
 
     WindowSel* sel = [WindowSel getDefault];
     sel.title = windowTitle;
@@ -1856,10 +1975,11 @@ static NSImage* hls_button_image(NSImage* img){
   // Add camera menu
   cameras = [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo];
   for(AVCaptureDevice *camera in cameras){
+    NSString* cameraName = getCameraNameForId([camera uniqueID]);
     WindowSel* sel = [WindowSel getDefault];
-    sel.title = [camera localizedName];
+    sel.title = cameraName;
     sel.cameraId = [camera uniqueID];
-    ADD_MENU_ITEM(camera_menu, [camera localizedName], @selector(changeWindow:), NULL, {
+    ADD_MENU_ITEM(camera_menu, cameraName, @selector(changeWindow:), NULL, {
       [item setRepresentedObject:sel];
     })
   }
@@ -1869,7 +1989,7 @@ static NSImage* hls_button_image(NSImage* img){
     })
   }
 
-  ADD_MENU_ITEM(theMenu, @"Stream HLS", @selector(loadHLSStream:), GET_REL_IMG(hls))
+  ADD_MENU_ITEM(theMenu, @"Open Stream URL…", @selector(loadHLSStream:), GET_REL_IMG(hls))
 #ifndef NO_AIRPLAY
   if (airplay_sender_enabled && [self is_capturing]) {
     // Show start/stop options based on senderQueue state
@@ -1908,6 +2028,57 @@ static NSImage* hls_button_image(NSImage* img){
     }
   }
 #endif
+
+  // Streaming submenu
+  if ([self is_capturing] || is_hls_session || camera_id) {
+    NSMenu *streamMenu = [[NSMenu alloc] init];
+
+    if (streamManager && [streamManager isStreaming]) {
+      ADD_MENU_ITEM(streamMenu, @"Stop Broadcasting", @selector(stopStreamAction:), NULL)
+      [streamMenu addItem:[NSMenuItem separatorItem]];
+      ADD_MENU_ITEM(streamMenu, @"Copy URL", @selector(copyStreamURL:), NULL)
+      ADD_MENU_ITEM(streamMenu, @"Open in Browser", @selector(openStreamInBrowser:), NULL)
+    } else {
+      ADD_MENU_ITEM(streamMenu, @"Broadcast This Window", @selector(startStreamAction:), NULL)
+    }
+
+    [streamMenu addItem:[NSMenuItem separatorItem]];
+
+    // Quality submenu
+    NSMenu *qualitySubmenu = [[NSMenu alloc] init];
+    StreamQuality currentQ = streamManager ? [streamManager currentQuality] : StreamQualityMedium;
+
+    NSArray *qualityNames = @[@"Low (720p)", @"Medium (1080p)", @"High (native)"];
+    NSArray *qualityValues = @[@(StreamQualityLow), @(StreamQualityMedium), @(StreamQualityHigh)];
+
+    for (int i = 0; i < 3; i++) {
+      NSMenuItem *qItem = [qualitySubmenu addItemWithTitle:qualityNames[i] action:@selector(setStreamQuality:) keyEquivalent:@""];
+      [qItem setTarget:self];
+      [qItem setTag:[qualityValues[i] intValue]];
+      if ([qualityValues[i] intValue] == (int)currentQ) {
+        [qItem setState:NSControlStateValueOn];
+      }
+    } // End of loop through quality options
+
+    ADD_MENU_ITEM(streamMenu, @"Quality", nil, NULL, {
+      [item setSubmenu:qualitySubmenu];
+    })
+
+    // Show URL as info if streaming
+    if (streamManager && [streamManager isStreaming]) {
+      [streamMenu addItem:[NSMenuItem separatorItem]];
+      NSString *url = [streamManager streamURL];
+      if (url) {
+        NSMenuItem *urlItem = [streamMenu addItemWithTitle:url action:nil keyEquivalent:@""];
+        [urlItem setEnabled:NO];
+      }
+    }
+
+    ADD_MENU_ITEM(theMenu, @"Broadcast", nil, NULL, {
+      [item setSubmenu:streamMenu];
+    })
+  }
+
 end:
   if(is_hls_session && !pvc){
     // Add quality/resolution selection menu for HLS
@@ -1972,6 +2143,15 @@ end:
         [item setSubmenu:resolutionMenu];
       })
     }
+
+    // Local audio monitoring toggle (does not affect HLS streaming)
+    if(camera_has_microphone) {
+      ADD_MENU_ITEM(theMenu, @"Local Audio Monitoring", @selector(toggleCameraAudio:), NULL, {
+        if(camera_audio_monitoring) {
+          [item setState:NSControlStateValueOn];
+        }
+      })
+    }
   }
 
   if(!pvc && ([self is_capturing] || is_airplay_session || is_hls_session)){
@@ -2028,6 +2208,91 @@ end:
   [self setAlphaValue:slider.doubleValue];
 }
 
+#pragma mark - Streaming Methods
+
+/**
+ * Start streaming the current window content.
+ * Creates a StreamManager if needed, reads port/quality from preferences,
+ * and copies the stream URL to the clipboard on success.
+ */
+- (void)startStreamAction:(id)sender {
+  if (!imageView) return;
+
+  if (!streamManager) {
+    streamManager = [[StreamManager alloc] initWithImageView:imageView];
+  }
+
+  // stream_port is stored as NSString by TextInput preferences
+  NSObject *portPref = getPref(@"stream_port");
+  int port = 8080;
+  if ([portPref isKindOfClass:[NSString class]]) {
+    port = [(NSString*)portPref intValue];
+  } else if ([portPref isKindOfClass:[NSNumber class]]) {
+    port = [(NSNumber*)portPref intValue];
+  }
+  if (port <= 0 || port > 65535) port = 8080;
+
+  StreamQuality quality = (StreamQuality)[(NSNumber*)getPref(@"stream_quality") intValue];
+
+  BOOL success = [streamManager startStreamingOnPort:port withQuality:quality];
+  if (success) {
+    NSString *url = [streamManager streamURL];
+    NSLog(@"Streaming started at %@", url);
+    // Copy direct stream URL to clipboard automatically
+    NSString *directURL = [url stringByAppendingString:@"/stream.m3u8"];
+    [[NSPasteboard generalPasteboard] clearContents];
+    [[NSPasteboard generalPasteboard] setString:directURL forType:NSPasteboardTypeString];
+  }
+} // End of startStreamAction:
+
+/**
+ * Stop the current streaming session.
+ */
+- (void)stopStreamAction:(id)sender {
+  if (streamManager) {
+    [streamManager stopStreaming];
+  }
+} // End of stopStreamAction:
+
+/**
+ * Copy the stream URL to the system clipboard.
+ */
+- (void)copyStreamURL:(id)sender {
+  if (streamManager && [streamManager isStreaming]) {
+    NSString *url = [streamManager streamURL];
+    if (url) {
+      NSString *directURL = [url stringByAppendingString:@"/stream.m3u8"];
+      [[NSPasteboard generalPasteboard] clearContents];
+      [[NSPasteboard generalPasteboard] setString:directURL forType:NSPasteboardTypeString];
+    }
+  }
+} // End of copyStreamURL:
+
+/**
+ * Open the stream URL in the default web browser.
+ */
+- (void)openStreamInBrowser:(id)sender {
+  if (streamManager && [streamManager isStreaming]) {
+    NSString *url = [streamManager streamURL];
+    if (url) {
+      [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:url]];
+    }
+  }
+} // End of openStreamInBrowser:
+
+/**
+ * Set the streaming quality from a menu item tag.
+ * Saves the preference and updates the active stream if running.
+ */
+- (void)setStreamQuality:(id)sender {
+  NSMenuItem *menuItem = (NSMenuItem *)sender;
+  StreamQuality quality = (StreamQuality)[menuItem tag];
+  setPref(@"stream_quality", [NSNumber numberWithInt:(int)quality]);
+  if (streamManager) {
+    [streamManager setQuality:quality];
+  }
+} // End of setStreamQuality:
+
 -(void)stopDisplayStream{
   if(!display_stream) return;
   CGDisplayStreamStop(display_stream);
@@ -2049,16 +2314,34 @@ end:
 #endif
 }
 
+#pragma mark - Camera Audio Methods
+
+/**
+ * Stops camera capture and cleans up resources.
+ */
 -(void)stopCameraCapture{
   if(!camera_session) return;
+
+  // Remove notification observers before stopping
+  [[NSNotificationCenter defaultCenter] removeObserver:self name:AVCaptureSessionRuntimeErrorNotification object:camera_session];
+  [[NSNotificationCenter defaultCenter] removeObserver:self name:AVCaptureSessionDidStopRunningNotification object:camera_session];
+  [[NSNotificationCenter defaultCenter] removeObserver:self name:AVCaptureDeviceWasDisconnectedNotification object:nil];
+
   [camera_session stopRunning];
+
+  // Clean up audio preview
+  camera_audio_preview = nil;
+  camera_has_microphone = false;
+
   camera_session = nil;
   camera_input = nil;
   camera_output = nil;
+  camera_audio_output = nil;
   camera_id = nil;
   camera_format = nil;
   camera_position = AVCaptureDevicePositionUnspecified;
-}
+  camera_audio_sample_count = 0;
+} // End of stopCameraCapture
 
 -(NSArray<NSDictionary *> *)getAvailableCameraResolutions:(NSString*)deviceId {
   NSMutableArray *resolutions = [[NSMutableArray alloc] init];
@@ -2226,6 +2509,92 @@ end:
     // We'll handle un-mirroring in the capture output delegate if needed
   }
 
+  // Set up audio preview if enabled - uses AVCaptureAudioPreviewOutput for automatic format handling
+  camera_has_microphone = false;
+  camera_audio_preview = nil;
+  camera_audio_output = nil;
+  camera_audio_sample_count = 0;
+
+  if(camera_audio_enabled) {
+    // Check microphone permission
+    AVAuthorizationStatus audioAuthStatus = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
+    
+    __block BOOL micPermissionGranted = (audioAuthStatus == AVAuthorizationStatusAuthorized);
+    
+    if(audioAuthStatus == AVAuthorizationStatusNotDetermined) {
+      // Request permission synchronously using a semaphore
+      dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+      [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio completionHandler:^(BOOL granted) {
+        micPermissionGranted = granted;
+        dispatch_semaphore_signal(semaphore);
+      }];
+      dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC));
+    }
+
+    if(micPermissionGranted) {
+      // Try to find an audio device associated with this camera
+      AVCaptureDevice *audioDevice = nil;
+      NSArray<AVCaptureDevice *> *audioDevices = [AVCaptureDevice devicesWithMediaType:AVMediaTypeAudio];
+      
+      for(AVCaptureDevice *audioD in audioDevices) {
+        if([audioD.localizedName containsString:device.localizedName] ||
+           [audioD.manufacturer isEqualToString:device.manufacturer]) {
+          audioDevice = audioD;
+          NSLog(@"Found matching audio device: %@ for camera: %@", audioD.localizedName, device.localizedName);
+          break;
+        }
+      }
+
+      // If no matching audio device found, use the default microphone
+      if(!audioDevice && audioDevices.count > 0) {
+        audioDevice = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio];
+        NSLog(@"Using default audio device: %@", audioDevice.localizedName);
+      }
+
+      if(audioDevice) {
+        NSError *audioError = nil;
+        AVCaptureDeviceInput *audioInput = [[AVCaptureDeviceInput alloc] initWithDevice:audioDevice error:&audioError];
+        
+        if(audioError || !audioInput) {
+          NSLog(@"Failed to create audio input: %@", audioError);
+        } else if(![session canAddInput:audioInput]) {
+          NSLog(@"Cannot add audio input to camera session");
+        } else {
+          [session addInput:audioInput];
+
+          AVCaptureAudioDataOutput *audioDataOutput = [[AVCaptureAudioDataOutput alloc] init];
+          dispatch_queue_t audioQueue = dispatch_queue_create("com.pip.camera.audio", DISPATCH_QUEUE_SERIAL);
+          [audioDataOutput setSampleBufferDelegate:self queue:audioQueue];
+          if([session canAddOutput:audioDataOutput]) {
+            [session addOutput:audioDataOutput];
+            camera_audio_output = audioDataOutput;
+            camera_has_microphone = true;
+            NSLog(@"Camera audio stream output configured for outgoing HLS audio");
+          } else {
+            NSLog(@"Cannot add audio data output to camera session");
+          }
+
+          // Use AVCaptureAudioPreviewOutput for automatic audio playback
+          // This handles all format conversion automatically
+          AVCaptureAudioPreviewOutput *audioPreview = [[AVCaptureAudioPreviewOutput alloc] init];
+          audioPreview.volume = camera_audio_monitoring ? 1.0 : 0.0;
+          audioPreview.outputDeviceUniqueID = nil;  // Use default output device
+
+          if(![session canAddOutput:audioPreview]) {
+            NSLog(@"Cannot add audio preview output to camera session");
+          } else {
+            [session addOutput:audioPreview];
+            camera_audio_preview = audioPreview;
+            camera_has_microphone = true;
+            NSLog(@"Camera audio preview configured for device: %@", audioDevice.localizedName);
+          }
+        }
+      }
+    } else {
+      NSLog(@"Microphone permission not granted, camera audio disabled");
+    }
+  } // End of audio configuration
+
   camera_session = session;
   camera_input = input;
   camera_output = output;
@@ -2237,6 +2606,12 @@ end:
     camera_format = device.activeFormat;
   }
 
+  // Register for camera disconnect/error notifications
+  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(cameraSessionError:) name:AVCaptureSessionRuntimeErrorNotification object:session];
+  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(cameraSessionError:) name:AVCaptureSessionDidStopRunningNotification object:session];
+  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(cameraSessionError:) name:AVCaptureDeviceWasDisconnectedNotification object:device];
+
+  // Start session after all inputs/outputs are configured
   [session startRunning];
 
   is_playing = true;
@@ -2245,6 +2620,21 @@ end:
 
 - (void)captureOutput:(AVCaptureOutput *)output didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer fromConnection:(AVCaptureConnection *)connection {
   if(!is_playing || isWinClosing || !camera_session) return;
+
+  if([output isKindOfClass:[AVCaptureAudioDataOutput class]]) {
+    camera_audio_sample_count++;
+    if(camera_audio_sample_count == 1 || (camera_audio_sample_count % 500 == 0)) {
+      NSLog(@"Camera audio callback samples=%llu", (unsigned long long)camera_audio_sample_count);
+    }
+    if(streamManager && [streamManager isStreaming]) {
+      [streamManager pushAudioSampleBuffer:sampleBuffer];
+    }
+    return;
+  }
+
+  if(![output isKindOfClass:[AVCaptureVideoDataOutput class]]) {
+    return;
+  }
 
   CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
   if(!imageBuffer) return;
@@ -2258,7 +2648,7 @@ end:
       }
     });
   }
-}
+} // End of captureOutput:didOutputSampleBuffer:fromConnection:
 
 - (void)changeWindow:(id)sender{
   WindowSel* sel = [sender representedObject];
@@ -2311,6 +2701,10 @@ end:
     };
 
     display_stream = CGDisplayStreamCreateWithDispatchQueue(display_id, width, height, kCVPixelFormatType_32BGRA,  (__bridge CFDictionaryRef)opts, dispatch_get_main_queue(), ^(CGDisplayStreamFrameStatus status, uint64_t displayTime, IOSurfaceRef frameSurface, CGDisplayStreamUpdateRef updateRef) {
+      if(status == kCGDisplayStreamFrameStatusStopped){
+        if(!self->isWinClosing) [self showDisconnectOverlay:@"Display disconnected"];
+        return;
+      }
       if(status != kCGDisplayStreamFrameStatusFrameComplete || !self->is_playing || self->isWinClosing) return;
       [self->imageView setImage:[CIImage imageWithIOSurface:frameSurface]];
     });
@@ -2344,20 +2738,143 @@ end:
 //  [imageView setImage:nil];
   [imageView setHidden:![self is_capturing]];
   [self setOwner:sel.owner withTitle:sel.title];
+
+  // Hide or show source hint overlay based on capture state
+  if(sourceHintOverlay){
+    [sourceHintOverlay setHidden:[self is_capturing]];
+  }
 }
+
+/**
+ * Shows the disconnect overlay with a message explaining why the source was lost.
+ * Stops all capture, resets source state, and displays the overlay with the given message
+ * plus a hint to right-click for a new source.
+ * Must be called on the main thread.
+ * @param message The disconnect reason to display (e.g. "Display disconnected")
+ */
+- (void)showDisconnectOverlay:(NSString*)message{
+  if(isWinClosing) return;
+
+  [self stopTimer];
+  [self stopDisplayStream];
+  [self stopWindowStream];
+  [self stopCameraCapture];
+
+  window_id = -1;
+  display_id = -1;
+  is_playing = false;
+  [self resetPlaybackSate];
+
+  [imageView setHidden:YES];
+
+  if(sourceHintOverlay && hintLabel){
+    hintLabel.stringValue = [NSString stringWithFormat:@"%@\nRight-click to select source", message];
+    [sourceHintOverlay setHidden:NO];
+  }
+
+  [self setOwner:nil withTitle:message];
+} // End of showDisconnectOverlay:
+
+/**
+ * Called when a display is physically disconnected.
+ * If this window was capturing that display, shows a disconnect overlay.
+ * @param displayId The ID of the disconnected display
+ */
+- (void)handleDisplayDisconnected:(CGDirectDisplayID)displayId{
+  if(display_id >= 0 && (CGDirectDisplayID)display_id == displayId){
+    [self showDisconnectOverlay:@"Display disconnected"];
+  }
+} // End of handleDisplayDisconnected:
+
+/**
+ * Called when the camera capture session encounters an error or the device is disconnected.
+ * Shows a disconnect overlay with the appropriate message.
+ * @param notification The notification containing error information
+ */
+- (void)cameraSessionError:(NSNotification*)notification{
+  if(!camera_session) return;
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if(self->isWinClosing) return;
+    [self showDisconnectOverlay:@"Camera unavailable"];
+  });
+} // End of cameraSessionError:
+
+/**
+ * Clones the current source selection to another window.
+ * Creates a WindowSel from the current state and triggers changeWindow on the target.
+ * Camera sources are skipped since AVCaptureDevice is exclusive to one session.
+ * @param target The window to clone the source to
+ * @return YES if cloning succeeded, NO if source can't be cloned (camera or no source)
+ */
+- (BOOL) cloneSourceToWindow:(Window*)target{
+  if(![self is_capturing] && !is_hls_session) return NO;
+
+  // Camera can't be shared between sessions
+  if(camera_id != nil){
+    NSLog(@"Cannot clone camera source — AVCaptureDevice is exclusive to one session");
+    return NO;
+  }
+
+  WindowSel* sel = [WindowSel getDefault];
+  sel.winId = window_id;
+  sel.dspId = display_id;
+  sel.ownerPid = owner_pid;
+  sel.cameraId = nil;
+  sel.owner = nil;
+  sel.title = self.title;
+
+  NSMenuItem* item = [[NSMenuItem alloc] init];
+  [item setRepresentedObject:sel];
+  [target changeWindow:item];
+  return YES;
+} // End of cloneSourceToWindow:
+
+/**
+ * Returns a string describing the type of source this window is capturing.
+ * @return Source type string (e.g. "Display", "Window", "Camera", "HLS", "AirPlay")
+ */
+- (NSString*) sourceType{
+  if(is_airplay_session) return @"AirPlay";
+  if(is_hls_session) return @"HLS";
+  if(camera_id != nil) return @"Camera";
+  if(display_id >= 0) return @"Display";
+  if(window_id >= 0) return @"Window";
+  return @"None";
+} // End of sourceType
+
+/**
+ * Returns a string describing the current status of this window's capture.
+ * @return Status string (e.g. "Active", "Paused", "No source")
+ */
+- (NSString*) sourceStatus{
+  if(![self is_capturing] && !is_hls_session && !is_airplay_session) return @"No source";
+  if(is_playing) return @"Active";
+  return @"Paused";
+} // End of sourceStatus
 
 
 #if __has_include(<ScreenCaptureKit/ScreenCaptureKit.h>)
 
 // SCStreamDelegate method - called when stream stops
 - (void)stream:(SCStream *)stream didStopWithError:(NSError *)error API_AVAILABLE(macos(12.3)) {
-  if (error) {
-    NSLog(@"ScreenCaptureKit stream stopped with error: %@", error);
-  }
+  NSLog(@"ScreenCaptureKit stream stopped%@", error ? [NSString stringWithFormat:@" with error: %@", error] : @"");
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if(self->isWinClosing) return;
+    [self showDisconnectOverlay:@"Window closed"];
+  });
 }
 
 - (void)stream:(SCStream *)stream didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer ofType:(SCStreamOutputType)type API_AVAILABLE(macos(12.3)){
   if(!is_playing || isWinClosing) return;
+
+  if (@available(macOS 13.0, *)) {
+    if (type == SCStreamOutputTypeAudio) {
+      if (streamManager && [streamManager isStreaming]) {
+        [streamManager pushAudioSampleBuffer:sampleBuffer];
+      }
+      return;
+    }
+  }
 
   CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
   if (!imageBuffer) {
@@ -2480,6 +2997,9 @@ end:
         streamConfig.minimumFrameInterval = CMTimeMake(1, refreshRate);
         streamConfig.scalesToFit = NO;
         streamConfig.queueDepth = 2;
+        streamConfig.capturesAudio = YES;
+        streamConfig.sampleRate = 48000;
+        streamConfig.channelCount = 2;
 
         NSLog(@"startWindowStream: window_id=%d, windowFrame={%.1f,%.1f,%.1f,%.1f}, is_hidpi=%d, config=%lux%lu",
               window_id, windowFrame.origin.x, windowFrame.origin.y, windowFrame.size.width, windowFrame.size.height,
@@ -2502,6 +3022,14 @@ end:
             [self startTimer:1.0/refreshRate];
           });
           return;
+        }
+
+        if (@available(macOS 13.0, *)) {
+          NSError *audioOutputError = nil;
+          BOOL audioOutputAdded = [self->window_stream addStreamOutput:self type:SCStreamOutputTypeAudio sampleHandlerQueue:dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0) error:&audioOutputError];
+          if (!audioOutputAdded || audioOutputError) {
+            NSLog(@"ScreenCaptureKit audio output unavailable: %@", audioOutputError);
+          }
         }
 
         // Start stream
@@ -2981,7 +3509,22 @@ end:
       NSLog(@"Failed to lock device for configuration: %@", error);
     }
   }
-}
+} // End of selectCameraResolution:
+
+/**
+ * Toggles local camera audio monitoring on/off.
+ * Only affects the local audio preview volume; audio capture and HLS streaming are not affected.
+ * @param sender The menu item that triggered this action
+ */
+-(void)toggleCameraAudio:(id)sender {
+  camera_audio_monitoring = !camera_audio_monitoring;
+
+  if(camera_audio_preview) {
+    camera_audio_preview.volume = camera_audio_monitoring ? 1.0 : 0.0;
+  }
+
+  NSLog(@"Local camera audio monitoring %@", camera_audio_monitoring ? @"enabled" : @"disabled");
+} // End of toggleCameraAudio:
 
 - (void)updateHLSInputViewLayout {
   if (!hlsInputView) return;
@@ -3239,7 +3782,27 @@ end:
 }
 
 - (void)windowWillClose:(NSNotification *)notification{
-//  NSLog(@"windowWillClose");
+  isWinClosing = true;
+  [self stopTimer];
+  [self stopDisplayStream];
+  [self stopWindowStream];
+  [self stopCameraCapture];
+
+  // Stop streaming if active
+  if (streamManager) {
+    [streamManager stopStreaming];
+    streamManager = nil;
+  }
+  CGDisplayRemoveReconfigurationCallback(displayReconfigurationCallback, (__bridge void*)self);
+
+  // If this is the last PiP window, terminate the app
+  NSInteger remainingPipWindows = 0;
+  for(NSWindow* w in [[NSApplication sharedApplication] windows]){
+    if([w isKindOfClass:[Window class]] && w != self) remainingPipWindows++;
+  }
+  if(remainingPipWindows == 0){
+    [[NSApplication sharedApplication] terminate:nil];
+  }
 }
 
 - (void)windowDidBecomeKey:(NSNotification *)notification{
@@ -3251,7 +3814,6 @@ end:
 //}
 
 - (void)close{
-//  NSLog(@"close pvc: %d, isPipCLosing: %d, isWinClosing: %d", (int)pvc, isPipCLosing, isWinClosing);
   [self dismissHLSInputView];
   if(pvc){
     if(!isPipCLosing){
@@ -3273,6 +3835,14 @@ end:
 
   if(isWinClosing) return;
   isWinClosing = true;
+
+  // Unregister display reconfiguration callback
+  CGDisplayRemoveReconfigurationCallback(displayReconfigurationCallback, (__bridge void*)self);
+
+  // Remove camera disconnect notification observers
+  [[NSNotificationCenter defaultCenter] removeObserver:self name:AVCaptureSessionRuntimeErrorNotification object:nil];
+  [[NSNotificationCenter defaultCenter] removeObserver:self name:AVCaptureSessionDidStopRunningNotification object:nil];
+  [[NSNotificationCenter defaultCenter] removeObserver:self name:AVCaptureDeviceWasDisconnectedNotification object:nil];
 
   #ifndef NO_AIRPLAY
   if(is_airplay_session) airplay_receiver_session_stop(self.conn);
@@ -3304,6 +3874,10 @@ end:
   [popbutt removeFromSuperview];
   [playbutt removeFromSuperview];
   [selectionView removeFromSuperview];
+  if(sourceHintOverlay){
+    [sourceHintOverlay removeFromSuperview];
+    sourceHintOverlay = nil;
+  }
   [rootView removeFromSuperview];
 
   nvc = NULL;
