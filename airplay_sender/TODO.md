@@ -22,6 +22,10 @@ Based on analysis of the existing receiver implementation, AirPlay 2 uses:
 - **AES-CTR** for video encryption (`mirror_buffer.c`, `aes_ctr.c`)
 - **SHA-512** for hashing
 
+> Receiver interop RE (why encrypted mirroring fails with some receivers, and how a real
+> receiver derives its video key) is documented in
+> [`docs/moto-softmedia-receiver-re.md`](docs/moto-softmedia-receiver-re.md).
+
 ### Streaming Layer
 - **TCP** for video mirroring (port negotiated during `/stream` setup)
 - **RTP/UDP** for audio streaming
