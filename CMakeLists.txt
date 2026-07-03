@@ -27,8 +27,31 @@ target_link_libraries(pip PUBLIC -fobjc-link-runtime
 )
 
 if(${AIRPLAY_SUPPORT_ENABLED} EQUAL 1)
+  enable_language(ASM)
   file(GLOB_RECURSE airplay_src CONFIGURE_DEPENDS "airplay*/*.c")
-  add_library(airplay ${airplay_src})
+  # Test programs have their own main(); keep them out of the library.
+  list(FILTER airplay_src EXCLUDE REGEX "airplay_sender/fpemu/test_fpemu\\.c$")
+  list(FILTER airplay_src EXCLUDE REGEX "airplay_sender/test_mirror_crypto\\.c$")
+
+  # FairPlay snapshot blob: extracted at build time from the doubletake source
+  # (Apple's proprietary code — NEVER committed; see airplay_sender/fpemu/README.md).
+  set(FPEMU_DIR ${CMAKE_CURRENT_SOURCE_DIR}/airplay_sender/fpemu)
+  set(DOUBLETAKE_FPDATA
+      "${CMAKE_CURRENT_SOURCE_DIR}/third_party/doubletake/internal/fpemu/fpexchange_data.go"
+      CACHE FILEPATH "Path to doubletake fpexchange_data.go for FairPlay blob extraction")
+  add_custom_command(
+    OUTPUT ${FPEMU_DIR}/fp_blob.bin
+    COMMAND python3 ${FPEMU_DIR}/extract_blob.py ${DOUBLETAKE_FPDATA} ${FPEMU_DIR}/fp_blob.bin
+    DEPENDS ${FPEMU_DIR}/extract_blob.py
+    COMMENT "Extracting FairPlay blob from ${DOUBLETAKE_FPDATA}"
+    VERBATIM)
+  # fp_blob.S does `.incbin "fp_blob.bin"`, so rebuild it when the blob changes.
+  set_source_files_properties(${FPEMU_DIR}/fp_blob.S PROPERTIES
+    OBJECT_DEPENDS ${FPEMU_DIR}/fp_blob.bin)
+
+  add_library(airplay ${airplay_src} ${FPEMU_DIR}/fp_blob.S)
+  # Give the assembler the include path so `.incbin "fp_blob.bin"` resolves.
+  target_include_directories(airplay PRIVATE ${FPEMU_DIR})
   target_link_libraries(pip PUBLIC airplay)
   target_include_directories(pip PRIVATE airplay airplay_sender)
 else()

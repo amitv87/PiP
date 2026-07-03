@@ -105,25 +105,41 @@ int stream_client_connect_feedback(stream_client_t *client, const char *host);
 int stream_client_get_info_rtsp(stream_client_t *client, struct http_client_s *http_client);
 
 /**
- * Send RTSP SETUP request with binary plist
- * host: Receiver hostname
- * port: Receiver port
- * ekey: 72-byte FairPlay-encrypted AES key (or NULL to skip ekey/eiv)
- * eiv: 16-byte AES IV (or NULL to skip ekey/eiv)
- * timing_port: Our NTP client port
- * device_id: Device MAC address
- * os_name: OS name
- * os_version: OS version
- * model: Device model
- * name: Device name
+ * Send an AirPlay 2 mirroring RTSP SETUP request (video stream, type 110).
+ * Builds the binary-plist SETUP the way real AirPlay 2 senders do: full session
+ * context, timingProtocol=NTP, isScreenMirroringSession, and a streams array
+ * with a typed video stream descriptor. No RAOP Transport header.
+ *
+ * host/port:    receiver address
+ * ekey/eiv:     72-byte FairPlay ekey + 16-byte eiv (root level; may be NULL)
+ * timing_port:  OUR local NTP timing-responder port (the receiver probes it)
+ * session_uuid: session UUID string shared across SETUP/RECORD
+ * shk/shiv:     16-byte stream encryption key + IV placed on the video stream
+ *               descriptor (may be NULL)
+ * device_id:    client MAC-address string
+ * os_name/os_version/model/name: client identity
  * Returns 0 on success, -1 on error
  */
 int stream_client_setup_rtsp(stream_client_t *client, struct http_client_s *http_client,
                              const char *host, uint16_t port,
                              const unsigned char *ekey, const unsigned char *eiv,
-                             uint16_t timing_port,
+                             uint16_t timing_port, const char *session_uuid,
+                             const unsigned char *shk, const unsigned char *shiv,
                              const char *device_id, const char *os_name,
                              const char *os_version, const char *model, const char *name);
+
+/**
+ * Send the audio (type 96) SETUP that creates the mirroring session. Real
+ * senders create the audio session FIRST; the receiver attaches the video
+ * stream to it and only then renders. Uses the same sessionUUID as the video
+ * SETUP. audio_control_port is our local UDP control port. Returns 0 on success.
+ */
+int stream_client_setup_audio_rtsp(stream_client_t *client, struct http_client_s *http_client,
+                                   const char *host, uint16_t port,
+                                   const unsigned char *ekey, const unsigned char *eiv,
+                                   uint16_t timing_port, const char *session_uuid,
+                                   uint16_t audio_control_port,
+                                   const char *device_id, const char *model, const char *name);
 
 /**
  * Send RTSP RECORD request

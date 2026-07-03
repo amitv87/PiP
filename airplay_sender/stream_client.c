@@ -619,9 +619,18 @@ int
 stream_client_setup_rtsp(stream_client_t *client, struct http_client_s *http_client,
                          const char *host, uint16_t port,
                          const unsigned char *ekey, const unsigned char *eiv,
-                         uint16_t timing_port,
+                         uint16_t timing_port, const char *session_uuid,
+                         const unsigned char *shk, const unsigned char *shiv,
                          const char *device_id, const char *os_name,
-                         const char *os_version, const char *model, const char *name)
+                         const char *os_version, const char *model, const char *name);
+
+int
+stream_client_setup_audio_rtsp(stream_client_t *client, struct http_client_s *http_client,
+                               const char *host, uint16_t port,
+                               const unsigned char *ekey, const unsigned char *eiv,
+                               uint16_t timing_port, const char *session_uuid,
+                               uint16_t audio_control_port,
+                               const char *device_id, const char *model, const char *name)
 {
   http_client_response_t *response;
   plist_t root_node;
@@ -633,52 +642,168 @@ stream_client_setup_rtsp(stream_client_t *client, struct http_client_s *http_cli
   assert(http_client);
   assert(host);
   assert(device_id);
-  assert(os_name);
-  assert(os_version);
+
+  uint64_t audio_scid = generate_random_uint64();
+
+  root_node = plist_new_dict();
+  plist_dict_set_item(root_node, "deviceID", plist_new_string(device_id));
+  plist_dict_set_item(root_node, "macAddress", plist_new_string(device_id));
+  if (session_uuid) {
+    plist_dict_set_item(root_node, "sessionUUID", plist_new_string(session_uuid));
+  }
+  plist_dict_set_item(root_node, "sourceVersion", plist_new_string("280.33"));
+  plist_dict_set_item(root_node, "osBuildVersion", plist_new_string("20G165"));
+  plist_dict_set_item(root_node, "model", plist_new_string(model));
+  plist_dict_set_item(root_node, "name", plist_new_string(name ? name : model));
+  plist_dict_set_item(root_node, "timingProtocol", plist_new_string("NTP"));
+  plist_dict_set_item(root_node, "timingPort", plist_new_uint(timing_port));
+  if (ekey && eiv) {
+    plist_dict_set_item(root_node, "et", plist_new_uint(32));
+    plist_dict_set_item(root_node, "ekey", plist_new_data((const char *)ekey, 72));
+    plist_dict_set_item(root_node, "eiv", plist_new_data((const char *)eiv, 16));
+  }
+
+  // Audio stream descriptor (type 96, ALAC) — values from doubletake.
+  plist_t streams_node = plist_new_array();
+  plist_t sd = plist_new_dict();
+  plist_dict_set_item(sd, "type", plist_new_uint(96));
+  plist_dict_set_item(sd, "streamConnectionID", plist_new_uint(audio_scid));
+  plist_dict_set_item(sd, "ct", plist_new_uint(2));            // ALAC
+  plist_dict_set_item(sd, "spf", plist_new_uint(352));
+  plist_dict_set_item(sd, "sr", plist_new_uint(44100));
+  plist_dict_set_item(sd, "audioFormat", plist_new_uint(0x40000));
+  plist_dict_set_item(sd, "audioFormatIndex", plist_new_uint(0x12));
+  plist_dict_set_item(sd, "controlPort", plist_new_uint(audio_control_port));
+  plist_dict_set_item(sd, "audioMode", plist_new_string("default"));
+  plist_dict_set_item(sd, "usingScreen", plist_new_bool(1));
+  plist_dict_set_item(sd, "latencyMin", plist_new_uint(4410));
+  plist_dict_set_item(sd, "latencyMax", plist_new_uint(4410));
+  plist_dict_set_item(sd, "redundantAudio", plist_new_uint(0));
+  plist_dict_set_item(sd, "disableRetransmits", plist_new_bool(1));
+  plist_array_append_item(streams_node, sd);
+  plist_dict_set_item(root_node, "streams", streams_node);
+
+  plist_to_bin(root_node, &plist_data, &plist_len);
+  plist_free(root_node);
+  if (!plist_data || plist_len == 0) {
+    return -1;
+  }
+
+  snprintf(setup_url, sizeof(setup_url), "rtsp://%s:%u/%" PRIu64, host, port, audio_scid);
+
+  char headers[256];
+  snprintf(headers, sizeof(headers),
+           "Content-Type: application/x-apple-binary-plist\r\n");
+
+  response = http_client_request(http_client, "SETUP", setup_url, headers,
+                                 plist_data, (int)plist_len);
+  free(plist_data);
+
+  if (!response || response->status_code != 200) {
+    fprintf(stderr, "stream_client: audio SETUP (type 96) failed, status=%d\n",
+            response ? response->status_code : -1);
+    if (response) http_client_response_destroy(response);
+    return -1;
+  }
+
+  // Parse eventPort if present (the video SETUP also returns one).
+  if (response->body && response->body_len > 0) {
+    plist_t res = NULL;
+    plist_from_bin(response->body, response->body_len, &res);
+    if (res) {
+      plist_t ep = plist_dict_get_item(res, "eventPort");
+      if (ep && plist_get_node_type(ep) == PLIST_UINT) {
+        uint64_t v;
+        plist_get_uint_val(ep, &v);
+        client->info.event_port = (uint16_t)v;
+      }
+      plist_free(res);
+    }
+  }
+  fprintf(stderr, "stream_client: audio SETUP (type 96) ok, eventPort=%u\n",
+          client->info.event_port);
+  http_client_response_destroy(response);
+  return 0;
+}
+
+int
+stream_client_setup_rtsp(stream_client_t *client, struct http_client_s *http_client,
+                         const char *host, uint16_t port,
+                         const unsigned char *ekey, const unsigned char *eiv,
+                         uint16_t timing_port, const char *session_uuid,
+                         const unsigned char *shk, const unsigned char *shiv,
+                         const char *device_id, const char *os_name,
+                         const char *os_version, const char *model, const char *name)
+{
+  http_client_response_t *response;
+  plist_t root_node;
+  char *plist_data = NULL;
+  uint32_t plist_len = 0;
+  char setup_url[256];
+
+  (void)os_name;
+  (void)os_version;
+
+  assert(client);
+  assert(http_client);
+  assert(host);
+  assert(device_id);
   assert(model);
 
   root_node = plist_new_dict();
 
-  // Add ekey and eiv if provided (first SETUP call)
+  // ---- Session identity ----
+  plist_dict_set_item(root_node, "deviceID", plist_new_string(device_id));
+  plist_dict_set_item(root_node, "macAddress", plist_new_string(device_id));
+  if (session_uuid) {
+    plist_dict_set_item(root_node, "sessionUUID", plist_new_string(session_uuid));
+  }
+  plist_dict_set_item(root_node, "sourceVersion", plist_new_string("280.33"));
+  plist_dict_set_item(root_node, "osBuildVersion", plist_new_string("20G165"));
+  plist_dict_set_item(root_node, "model", plist_new_string(model));
+  plist_dict_set_item(root_node, "name", plist_new_string(name ? name : model));
+
+  // ---- Screen-mirroring session + NTP timing (we run the timing server) ----
+  plist_dict_set_item(root_node, "isScreenMirroringSession", plist_new_bool(1));
+  plist_dict_set_item(root_node, "timingProtocol", plist_new_string("NTP"));
+  plist_dict_set_item(root_node, "timingPort", plist_new_uint(timing_port));
+
+  // ---- FairPlay ekey/eiv at root (UxPlay reads these to derive the key) ----
   if (ekey && eiv) {
-    plist_t ekey_node = plist_new_data((const char *)ekey, 72);
-    plist_t eiv_node = plist_new_data((const char *)eiv, 16);
-    plist_dict_set_item(root_node, "ekey", ekey_node);
-    plist_dict_set_item(root_node, "eiv", eiv_node);
+    plist_dict_set_item(root_node, "et", plist_new_uint(32));
+    plist_dict_set_item(root_node, "ekey", plist_new_data((const char *)ekey, 72));
+    plist_dict_set_item(root_node, "eiv", plist_new_data((const char *)eiv, 16));
   }
 
-  // Add timing port
-  plist_t timing_port_node = plist_new_uint(timing_port);
-  plist_dict_set_item(root_node, "timingPort", timing_port_node);
-
-  // Add device info
-  plist_t os_name_node = plist_new_string(os_name);
-  plist_dict_set_item(root_node, "osName", os_name_node);
-
-  plist_t os_version_node = plist_new_string(os_version);
-  plist_dict_set_item(root_node, "osVersion", os_version_node);
-
-  plist_t model_node = plist_new_string(model);
-  plist_dict_set_item(root_node, "model", model_node);
-
-  if (name) {
-    plist_t name_node = plist_new_string(name);
-    plist_dict_set_item(root_node, "name", name_node);
-  }
-
-  // Add streams array with mirroring stream (type 110)
+  // ---- streams: [ video mirroring stream (type 110) ] ----
   plist_t streams_node = plist_new_array();
   plist_t stream_node = plist_new_dict();
 
-  plist_t stream_type_node = plist_new_uint(110);  // Mirroring
-  plist_dict_set_item(stream_node, "type", stream_type_node);
+  plist_dict_set_item(stream_node, "type", plist_new_uint(110));  // video mirroring
 
-  // Generate stream connection ID if not already set
   if (client->info.stream_connection_id == 0) {
     client->info.stream_connection_id = generate_random_uint64();
   }
-  plist_t stream_connection_id_node = plist_new_uint(client->info.stream_connection_id);
-  plist_dict_set_item(stream_node, "streamConnectionID", stream_connection_id_node);
+  plist_dict_set_item(stream_node, "streamConnectionID",
+                      plist_new_uint(client->info.stream_connection_id));
+
+  // timestampInfo descriptors, as real senders send them
+  plist_t ts_info_node = plist_new_array();
+  static const char *ts_names[] = {"SubSu", "BePxT", "AfPxT", "BefEn", "EmEnc"};
+  for (size_t i = 0; i < sizeof(ts_names) / sizeof(ts_names[0]); i++) {
+    plist_t ts_node = plist_new_dict();
+    plist_dict_set_item(ts_node, "name", plist_new_string(ts_names[i]));
+    plist_array_append_item(ts_info_node, ts_node);
+  }
+  plist_dict_set_item(stream_node, "timestampInfo", ts_info_node);
+
+  // Stream encryption key/iv live on the stream descriptor
+  if (shk) {
+    plist_dict_set_item(stream_node, "shk", plist_new_data((const char *)shk, 16));
+  }
+  if (shiv) {
+    plist_dict_set_item(stream_node, "shiv", plist_new_data((const char *)shiv, 16));
+  }
 
   plist_array_append_item(streams_node, stream_node);
   plist_dict_set_item(root_node, "streams", streams_node);
@@ -695,13 +820,11 @@ stream_client_setup_rtsp(stream_client_t *client, struct http_client_s *http_cli
   snprintf(setup_url, sizeof(setup_url), "rtsp://%s:%u/%" PRIu64,
            host, port, client->info.stream_connection_id);
 
-  // Send RTSP SETUP request
-  // The receiver's HTTP parser accepts RTSP methods
-  // Note: User-Agent is automatically added by http_client_request
+  // AirPlay 2 mirroring SETUP is a plain plist request — no RAOP Transport header
+  // (that header is what made the receiver reject the old SETUP with 501).
   char headers[512];
   snprintf(headers, sizeof(headers),
-           "Content-Type: application/x-apple-binary-plist\r\n"
-           "Transport: RTP/AVP/TCP\r\n");
+           "Content-Type: application/x-apple-binary-plist\r\n");
 
   // Use http_client_request with "SETUP" method (receiver accepts RTSP methods)
   response = http_client_request(http_client, "SETUP", setup_url,

@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		18192E3D0410B5113E564D7D /* fpemu_loader.c in Sources */ = {isa = PBXBuildFile; fileRef = 730DE42DE9E0DB80DB22127F /* fpemu_loader.c */; };
+		36EBD73413BA3092344A2A26 /* fpemu_map.c in Sources */ = {isa = PBXBuildFile; fileRef = C63011E27203C9AD71280D43 /* fpemu_map.c */; };
 		55338C06281AA9C200AC997B /* preferences.m in Sources */ = {isa = PBXBuildFile; fileRef = 55338C05281AA9C200AC997B /* preferences.m */; };
 		5547F69228144C5F00E22975 /* raop_rtp_mirror.c in Sources */ = {isa = PBXBuildFile; fileRef = 5547F63628144C5E00E22975 /* raop_rtp_mirror.c */; };
 		5547F69328144C5F00E22975 /* threads.h in Headers */ = {isa = PBXBuildFile; fileRef = 5547F63728144C5E00E22975 /* threads.h */; };
@@ -147,9 +149,20 @@
 		55FEB9A7 /* airplaySender.m in Sources */ = {isa = PBXBuildFile; fileRef = 55FEB9A2 /* airplaySender.m */; };
 		55FEB9A8 /* frame_capture.m in Sources */ = {isa = PBXBuildFile; fileRef = 55FEB9A4 /* frame_capture.m */; };
 		55FEB9A9 /* video_encoder.m in Sources */ = {isa = PBXBuildFile; fileRef = 55FEB9A6 /* video_encoder.m */; };
+		5D8D49B6F36631C0BA1F6DE5 /* fpemu_stubs.c in Sources */ = {isa = PBXBuildFile; fileRef = 38055371662075337EB0AEFE /* fpemu_stubs.c */; };
+		607D437838D0A435BA7A5A21 /* fp_blob.S in Sources */ = {isa = PBXBuildFile; fileRef = B9886F5DD658214BED3A77FE /* fp_blob.S */; };
+		60B1836655743F2F941E622A /* fpemu_decode.c in Sources */ = {isa = PBXBuildFile; fileRef = B7F0C4F00D3F9A26D42E8903 /* fpemu_decode.c */; };
+		852A7F44000580CA2B0F2712 /* fpemu_helpers.c in Sources */ = {isa = PBXBuildFile; fileRef = F668F3CD763387B5D3A910B4 /* fpemu_helpers.c */; };
+		9B4C1BE73B6BC5860F7381B8 /* mirror_crypto.c in Sources */ = {isa = PBXBuildFile; fileRef = BF1E4BBD282140BD8A457771 /* mirror_crypto.c */; };
+		A6CDD90F978599A95D995173 /* hap_pairing.c in Sources */ = {isa = PBXBuildFile; fileRef = 789BF465ABC681E0ED5C02B1 /* hap_pairing.c */; };
+		BD0A6DE0305C0FCE26CC96E5 /* tlv8.c in Sources */ = {isa = PBXBuildFile; fileRef = 4F82E3AC67FA73545BEC9DD7 /* tlv8.c */; };
+		F274247B6EA28471A864C138 /* fpemu_mem.c in Sources */ = {isa = PBXBuildFile; fileRef = E59FABE3C19CF150F96C8EAA /* fpemu_mem.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		3072E59E0BB5870A7EC6B9D8 /* fpemu.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = fpemu.h; sourceTree = "<group>"; };
+		38055371662075337EB0AEFE /* fpemu_stubs.c */ = {isa = PBXFileReference; includeInIndex = 1; path = fpemu_stubs.c; sourceTree = "<group>"; };
+		4F82E3AC67FA73545BEC9DD7 /* tlv8.c */ = {isa = PBXFileReference; includeInIndex = 1; path = tlv8.c; sourceTree = "<group>"; };
 		551EB2A5243B49AB002C6D34 /* cgs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = cgs.h; sourceTree = "<group>"; };
 		552115841FDD120F00F90350 /* PiP.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PiP.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		55338C04281AA9C200AC997B /* preferences.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = preferences.h; sourceTree = "<group>"; };
@@ -325,6 +338,18 @@
 		55FEB9A5 /* video_encoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = video_encoder.h; sourceTree = "<group>"; };
 		55FEB9A6 /* video_encoder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = video_encoder.m; sourceTree = "<group>"; };
 		55FEB9AA /* ScreenCaptureKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ScreenCaptureKit.framework; path = /System/Volumes/Data/Library/Developer/CommandLineTools/SDKs/MacOSX12.3.sdk/System/Library/Frameworks/ScreenCaptureKit.framework; sourceTree = "<group>"; };
+		730DE42DE9E0DB80DB22127F /* fpemu_loader.c */ = {isa = PBXFileReference; includeInIndex = 1; path = fpemu_loader.c; sourceTree = "<group>"; };
+		789BF465ABC681E0ED5C02B1 /* hap_pairing.c */ = {isa = PBXFileReference; includeInIndex = 1; path = hap_pairing.c; sourceTree = "<group>"; };
+		9022F86E3BCF63A04763E1C8 /* mirror_crypto.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = mirror_crypto.h; sourceTree = "<group>"; };
+		A02ECBF177A4F31CAC203E8E /* tlv8.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = tlv8.h; sourceTree = "<group>"; };
+		A4902D2D23F83F0A0272356C /* hap_pairing.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = hap_pairing.h; sourceTree = "<group>"; };
+		B7F0C4F00D3F9A26D42E8903 /* fpemu_decode.c */ = {isa = PBXFileReference; includeInIndex = 1; path = fpemu_decode.c; sourceTree = "<group>"; };
+		B9886F5DD658214BED3A77FE /* fp_blob.S */ = {isa = PBXFileReference; includeInIndex = 1; path = fp_blob.S; sourceTree = "<group>"; };
+		BF1E4BBD282140BD8A457771 /* mirror_crypto.c */ = {isa = PBXFileReference; includeInIndex = 1; path = mirror_crypto.c; sourceTree = "<group>"; };
+		C63011E27203C9AD71280D43 /* fpemu_map.c */ = {isa = PBXFileReference; includeInIndex = 1; path = fpemu_map.c; sourceTree = "<group>"; };
+		DC6B394D6ADD1F0BECF0F85F /* fpemu_priv.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = fpemu_priv.h; sourceTree = "<group>"; };
+		E59FABE3C19CF150F96C8EAA /* fpemu_mem.c */ = {isa = PBXFileReference; includeInIndex = 1; path = fpemu_mem.c; sourceTree = "<group>"; };
+		F668F3CD763387B5D3A910B4 /* fpemu_helpers.c */ = {isa = PBXFileReference; includeInIndex = 1; path = fpemu_helpers.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -622,8 +647,32 @@
 				55FEB947 /* video_encoder_stub.c */,
 				55FEB948 /* video_packetizer.c */,
 				55FEB949 /* video_packetizer.h */,
+				837380469C5D3F23DA896F4E /* fpemu */,
+				BF1E4BBD282140BD8A457771 /* mirror_crypto.c */,
+				9022F86E3BCF63A04763E1C8 /* mirror_crypto.h */,
+				4F82E3AC67FA73545BEC9DD7 /* tlv8.c */,
+				A02ECBF177A4F31CAC203E8E /* tlv8.h */,
+				789BF465ABC681E0ED5C02B1 /* hap_pairing.c */,
+				A4902D2D23F83F0A0272356C /* hap_pairing.h */,
 			);
 			path = airplay_sender;
+			sourceTree = "<group>";
+		};
+		837380469C5D3F23DA896F4E /* fpemu */ = {
+			isa = PBXGroup;
+			children = (
+				C63011E27203C9AD71280D43 /* fpemu_map.c */,
+				F668F3CD763387B5D3A910B4 /* fpemu_helpers.c */,
+				E59FABE3C19CF150F96C8EAA /* fpemu_mem.c */,
+				38055371662075337EB0AEFE /* fpemu_stubs.c */,
+				B7F0C4F00D3F9A26D42E8903 /* fpemu_decode.c */,
+				730DE42DE9E0DB80DB22127F /* fpemu_loader.c */,
+				B9886F5DD658214BED3A77FE /* fp_blob.S */,
+				3072E59E0BB5870A7EC6B9D8 /* fpemu.h */,
+				DC6B394D6ADD1F0BECF0F85F /* fpemu_priv.h */,
+			);
+			name = fpemu;
+			path = fpemu;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -715,6 +764,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5547F63528144BEF00E22975 /* Build configuration list for PBXNativeTarget "airplay" */;
 			buildPhases = (
+				EA10351817FB332A27AE0820 /* Extract FairPlay blob (fpemu) */,
 				5547F62928144BEF00E22975 /* Headers */,
 				5547F62A28144BEF00E22975 /* Sources */,
 				5547F62B28144BEF00E22975 /* Frameworks */,
@@ -776,6 +826,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		EA10351817FB332A27AE0820 /* Extract FairPlay blob (fpemu) */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Extract FairPlay blob (fpemu)";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/airplay_sender/fpemu/fp_blob.bin",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nFPEMU=\"$SRCROOT/airplay_sender/fpemu\"\nif [ -f \"$FPEMU/fp_blob.bin\" ]; then\n  echo \"fpemu: fp_blob.bin already present\"\n  exit 0\nfi\nCAND=\"${FPEMU_DOUBLETAKE_FPDATA:-$SRCROOT/third_party/doubletake/internal/fpemu/fpexchange_data.go}\"\nif [ ! -f \"$CAND\" ]; then\n  echo \"error: doubletake fpexchange_data.go not found at $CAND\" >&2\n  echo \"Set FPEMU_DOUBLETAKE_FPDATA=/path/to/fpexchange_data.go or add the doubletake submodule.\" >&2\n  exit 1\nfi\n/usr/bin/env python3 \"$FPEMU/extract_blob.py\" \"$CAND\" \"$FPEMU/fp_blob.bin\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		552115801FDD120F00F90350 /* Sources */ = {
@@ -869,6 +941,16 @@
 				5547F6C928144C5F00E22975 /* sap_hash.c in Sources */,
 				5547F69228144C5F00E22975 /* raop_rtp_mirror.c in Sources */,
 				5547F6CA28144C5F00E22975 /* fairplay_playfair.c in Sources */,
+				36EBD73413BA3092344A2A26 /* fpemu_map.c in Sources */,
+				852A7F44000580CA2B0F2712 /* fpemu_helpers.c in Sources */,
+				F274247B6EA28471A864C138 /* fpemu_mem.c in Sources */,
+				5D8D49B6F36631C0BA1F6DE5 /* fpemu_stubs.c in Sources */,
+				60B1836655743F2F941E622A /* fpemu_decode.c in Sources */,
+				18192E3D0410B5113E564D7D /* fpemu_loader.c in Sources */,
+				607D437838D0A435BA7A5A21 /* fp_blob.S in Sources */,
+				9B4C1BE73B6BC5860F7381B8 /* mirror_crypto.c in Sources */,
+				BD0A6DE0305C0FCE26CC96E5 /* tlv8.c in Sources */,
+				A6CDD90F978599A95D995173 /* hap_pairing.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -939,6 +1021,10 @@
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_STYLE = Automatic;
 				EXECUTABLE_PREFIX = lib;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/airplay_sender/fpemu",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -955,6 +1041,10 @@
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_STYLE = Automatic;
 				EXECUTABLE_PREFIX = lib;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/airplay_sender/fpemu",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

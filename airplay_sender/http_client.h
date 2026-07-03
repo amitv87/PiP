@@ -35,6 +35,15 @@ int http_client_connect(http_client_t *client);
 http_client_response_t *http_client_request(http_client_t *client,
     const char *method, const char *path,
     const char *headers, const char *body, int body_len);
+
+/* Enable HAP (HomeKit) control-channel encryption after pair-verify. From then
+ * on every request/response on this client is ChaCha20-Poly1305 framed
+ * ([2-byte LE length][ciphertext][16-byte tag], 1024-byte chunks, per-direction
+ * LE64 nonce counter). write_key encrypts client->receiver; read_key decrypts
+ * receiver->client. Matches airfry/doubletake and Apple's built-in sender. */
+void http_client_enable_encryption(http_client_t *client,
+    const uint8_t write_key[32], const uint8_t read_key[32]);
+
 void http_client_disconnect(http_client_t *client);
 void http_client_destroy(http_client_t *client);
 

@@ -38,6 +38,7 @@
 #include "../airplay/llhttp/llhttp.h"
 #include "../airplay/plist/plist/plist.h"
 #include "http_client.h"
+#include "mirror_crypto.h"
 
 #define HTTP_CLIENT_BUFFER_SIZE 4096
 #define HTTP_CLIENT_TIMEOUT_SEC 10
@@ -47,6 +48,13 @@ struct http_client_s {
   uint16_t port;
   int socket_fd;
   int connected;
+
+  /* HAP (HomeKit) control-channel encryption, enabled after pair-verify. */
+  int encrypted;
+  uint8_t enc_write_key[32];
+  uint8_t enc_read_key[32];
+  uint64_t enc_write_nonce;
+  uint64_t enc_read_nonce;
 };
 
 struct http_response_parser_s {
@@ -366,6 +374,286 @@ http_client_connect(http_client_t *client)
   return 0;
 }
 
+void
+http_client_enable_encryption(http_client_t *client,
+                              const uint8_t write_key[32],
+                              const uint8_t read_key[32])
+{
+  assert(client);
+  memcpy(client->enc_write_key, write_key, 32);
+  memcpy(client->enc_read_key, read_key, 32);
+  client->enc_write_nonce = 0;
+  client->enc_read_nonce = 0;
+  client->encrypted = 1;
+  fprintf(stderr, "http_client: HAP control-channel encryption enabled\n");
+}
+
+/* ---- HAP (HomeKit) control-channel framing --------------------------------
+ * After pair-verify, every RTSP request/response on this socket is carried as a
+ * sequence of ChaCha20-Poly1305 frames: [2-byte LE plaintext length][ciphertext
+ * ][16-byte tag], plaintext chunked at 1024 bytes. The AAD is the 2-byte length
+ * prefix; the nonce is [0;4]||LE64(per-direction counter). Faithful port of
+ * airfry rtsp.rs encrypt()/read_encrypted_frame(). */
+
+static void
+put_le64_bytes(uint8_t *p, uint64_t v)
+{
+  for (int i = 0; i < 8; i++) {
+    p[i] = (uint8_t)(v >> (8 * i));
+  }
+}
+
+/* Blocking recv of exactly len bytes, tolerating the socket's SO_RCVTIMEO so a
+ * slow receiver (SETUP can take >10s) does not abort the read. Returns 0 on
+ * success, -1 on EOF/error/overall-timeout. */
+static int
+recv_exact(http_client_t *client, uint8_t *buf, int len)
+{
+  int got = 0;
+  int timeouts = 0;
+  const int MAX_TIMEOUTS = 4;  /* ~4 * SO_RCVTIMEO before giving up */
+  while (got < len) {
+    int r = recv(client->socket_fd, buf + got, len - got, 0);
+    if (r > 0) {
+      got += r;
+      continue;
+    }
+    if (r == 0) {
+      return -1;  /* peer closed */
+    }
+    if (errno == EINTR) {
+      continue;
+    }
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+      if (++timeouts >= MAX_TIMEOUTS) {
+        return -1;
+      }
+      continue;
+    }
+    return -1;
+  }
+  return 0;
+}
+
+/* Encrypt a plaintext buffer as HAP frames and send it. Returns 0 / -1. */
+static int
+hap_send(http_client_t *client, const uint8_t *data, int len)
+{
+  int off = 0;
+  while (off < len) {
+    int n = len - off;
+    if (n > 1024) {
+      n = 1024;
+    }
+    uint8_t frame[2 + 1024 + 16];
+    frame[0] = (uint8_t)(n & 0xff);
+    frame[1] = (uint8_t)((n >> 8) & 0xff);
+    uint8_t nonce[12];
+    memset(nonce, 0, sizeof(nonce));
+    put_le64_bytes(nonce + 4, client->enc_write_nonce++);
+    chacha20poly1305_seal(client->enc_write_key, nonce, frame, 2,
+                          data + off, (size_t)n, frame + 2);
+    int total = 2 + n + 16;
+    int sent = 0;
+    while (sent < total) {
+      int r = send(client->socket_fd, frame + sent, total - sent, 0);
+      if (r <= 0) {
+        return -1;
+      }
+      sent += r;
+    }
+    off += n;
+  }
+  return 0;
+}
+
+/* Read + decrypt one HAP frame into out (capacity >= 1024). Returns the
+ * plaintext length, or -1 on error. */
+static int
+hap_read_frame(http_client_t *client, uint8_t *out)
+{
+  uint8_t lenbuf[2];
+  if (recv_exact(client, lenbuf, 2) != 0) {
+    return -1;
+  }
+  int plen = (int)lenbuf[0] | ((int)lenbuf[1] << 8);
+  if (plen <= 0 || plen > 1024) {
+    fprintf(stderr, "http_client: suspicious HAP frame length %d\n", plen);
+    return -1;
+  }
+  uint8_t ct[1024 + 16];
+  if (recv_exact(client, ct, plen + 16) != 0) {
+    return -1;
+  }
+  uint8_t nonce[12];
+  memset(nonce, 0, sizeof(nonce));
+  put_le64_bytes(nonce + 4, client->enc_read_nonce++);
+  if (chacha20poly1305_open(client->enc_read_key, nonce, lenbuf, 2,
+                            ct, (size_t)(plen + 16), out) != 0) {
+    fprintf(stderr, "http_client: HAP frame decrypt failed (nonce %llu)\n",
+            (unsigned long long)(client->enc_read_nonce - 1));
+    return -1;
+  }
+  return plen;
+}
+
+/* Scan the (already-complete) header block for Content-Length. Only matches at a
+ * line start to avoid false positives inside header values. Returns 0 if absent. */
+static int
+parse_content_length_hdr(const uint8_t *buf, int header_end)
+{
+  static const char *K = "content-length:";
+  int klen = 15;
+  for (int i = 0; i + klen <= header_end; i++) {
+    if (i != 0 && buf[i - 1] != '\n') {
+      continue;
+    }
+    int match = 1;
+    for (int j = 0; j < klen; j++) {
+      int c = buf[i + j];
+      if (c >= 'A' && c <= 'Z') {
+        c += 32;
+      }
+      if (c != K[j]) {
+        match = 0;
+        break;
+      }
+    }
+    if (!match) {
+      continue;
+    }
+    int p = i + klen;
+    while (p < header_end && (buf[p] == ' ' || buf[p] == '\t')) {
+      p++;
+    }
+    int val = 0;
+    while (p < header_end && buf[p] >= '0' && buf[p] <= '9') {
+      val = val * 10 + (buf[p] - '0');
+      p++;
+    }
+    return val;
+  }
+  return 0;
+}
+
+/* Send an encrypted RTSP request over the HAP control channel and read the
+ * encrypted response, returning it in the same shape as the plaintext path.
+ * Bypasses the plaintext read loop's EOF heuristics: HAP framing is
+ * self-delimiting and responses always carry Content-Length (or none == 0). */
+static http_client_response_t *
+http_client_request_encrypted(http_client_t *client, const char *request, int request_len)
+{
+  if (hap_send(client, (const uint8_t *)request, request_len) != 0) {
+    fprintf(stderr, "http_client: HAP send failed\n");
+    http_client_disconnect(client);
+    return NULL;
+  }
+
+  uint8_t *dec = NULL;
+  int dec_len = 0, dec_cap = 0;
+  int header_end = -1, content_length = 0, have_header = 0;
+
+  for (;;) {
+    uint8_t framebuf[1024];
+    int plen = hap_read_frame(client, framebuf);
+    if (plen < 0) {
+      free(dec);
+      http_client_disconnect(client);
+      return NULL;
+    }
+    if (dec_len + plen > dec_cap) {
+      int ncap = (dec_len + plen) * 2 + 256;
+      uint8_t *nd = realloc(dec, ncap);
+      if (!nd) {
+        free(dec);
+        http_client_disconnect(client);
+        return NULL;
+      }
+      dec = nd;
+      dec_cap = ncap;
+    }
+    memcpy(dec + dec_len, framebuf, plen);
+    dec_len += plen;
+
+    if (!have_header) {
+      for (int i = 0; i + 3 < dec_len; i++) {
+        if (dec[i] == '\r' && dec[i + 1] == '\n' &&
+            dec[i + 2] == '\r' && dec[i + 3] == '\n') {
+          header_end = i + 4;
+          have_header = 1;
+          content_length = parse_content_length_hdr(dec, header_end);
+          break;
+        }
+      }
+    }
+    if (have_header && dec_len >= header_end + content_length) {
+      break;
+    }
+    if (dec_len > 1024 * 1024) {
+      fprintf(stderr, "http_client: encrypted response too large\n");
+      free(dec);
+      http_client_disconnect(client);
+      return NULL;
+    }
+  }
+
+  /* llhttp expects HTTP; rewrite the RTSP status-line token in place. */
+  if (dec_len >= 7 && memcmp(dec, "RTSP/1.", 7) == 0) {
+    memcpy(dec, "HTTP", 4);
+  }
+
+  struct http_response_parser_s resp_parser;
+  resp_parser.status_code = 0;
+  resp_parser.headers = NULL;
+  resp_parser.headers_size = 0;
+  resp_parser.headers_length = 0;
+  resp_parser.body = NULL;
+  resp_parser.body_len = 0;
+  resp_parser.complete = 0;
+  resp_parser.protocol_replaced = 1;
+
+  llhttp_settings_init(&resp_parser.parser_settings);
+  resp_parser.parser_settings.on_status = &on_status;
+  resp_parser.parser_settings.on_header_field = &on_header_field;
+  resp_parser.parser_settings.on_header_value = &on_header_value;
+  resp_parser.parser_settings.on_body = &on_body;
+  resp_parser.parser_settings.on_message_complete = &on_message_complete;
+
+  llhttp_init(&resp_parser.parser, HTTP_RESPONSE, &resp_parser.parser_settings);
+  resp_parser.parser.data = &resp_parser;
+
+  llhttp_errno_t ret = llhttp_execute(&resp_parser.parser, (const char *)dec, dec_len);
+  if (ret == HPE_OK && !resp_parser.complete) {
+    llhttp_finish(&resp_parser.parser);
+  }
+  if (resp_parser.status_code == 0) {
+    resp_parser.status_code = resp_parser.parser.status_code;
+  }
+  free(dec);
+
+  if (ret != HPE_OK && !resp_parser.complete) {
+    fprintf(stderr, "http_client: encrypted parse error: %d\n", ret);
+    free(resp_parser.headers);
+    free(resp_parser.body);
+    http_client_disconnect(client);
+    return NULL;
+  }
+
+  http_client_response_t *response = calloc(1, sizeof(http_client_response_t));
+  if (!response) {
+    free(resp_parser.headers);
+    free(resp_parser.body);
+    return NULL;
+  }
+  response->status_code = resp_parser.status_code;
+  response->headers = resp_parser.headers;
+  response->body = resp_parser.body;
+  response->body_len = resp_parser.body_len;
+  fprintf(stderr, "http_client: encrypted response complete, status: %d, body: %d bytes\n",
+          response->status_code, response->body_len);
+  return response;
+}
+
 http_client_response_t *
 http_client_request(http_client_t *client, const char *method, const char *path,
                     const char *headers, const char *body, int body_len)
@@ -462,6 +750,13 @@ http_client_request(http_client_t *client, const char *method, const char *path,
 
   // Debug: log the request being sent
   fprintf(stderr, "http_client: sending request (%d bytes):\n%.*s\n", request_len, request_len, request);
+
+  // HAP control channel: once pair-verify has enabled encryption, every RTSP
+  // request/response on this socket is ChaCha20-Poly1305 framed. Take the
+  // self-contained encrypted path (send + read + parse) and return.
+  if (client->encrypted) {
+    return http_client_request_encrypted(client, request, request_len);
+  }
 
   sent = 0;
   while (sent < request_len) {

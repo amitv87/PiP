@@ -54,6 +54,31 @@ int video_packetizer_set_encryption(video_packetizer_t *pkt,
                                     const uint8_t *key, const uint8_t *iv);
 
 /**
+ * Enable ChaCha20-Poly1305 mode with a 32-byte stream key (Apple receivers).
+ * The whole access unit is sealed as one packet with a per-frame nonce; the
+ * 128-byte packet header is the AEAD associated data. Overrides AES-CTR.
+ */
+int video_packetizer_set_chacha(video_packetizer_t *pkt, const uint8_t key[32]);
+
+/**
+ * Enable the Apple receiver frame format (airfry/doubletake, real Apple TVs):
+ * one packet per H.264 access unit (all VCL NAL types 1-5 concatenated in AVCC),
+ * little-endian boot-relative NTP timestamps, and the SPS/PPS codec packet
+ * resent before every keyframe. Independent of the cipher — use with AES-CTR
+ * (video_packetizer_set_encryption, raw pairing) OR ChaCha (set_chacha, HAP).
+ * Without it, PiP's own/loopback format is used (per-NAL AES-CTR, big-endian
+ * timestamps, codec packet sent once).
+ */
+void video_packetizer_set_apple_format(video_packetizer_t *pkt);
+
+/**
+ * Send video with NO encryption (plaintext H.264), using the Apple per-AU
+ * framing. For receivers that accept unencrypted mirror video. Overrides the
+ * AES-CTR/ChaCha ciphers.
+ */
+void video_packetizer_set_plaintext(video_packetizer_t *pkt);
+
+/**
  * Packetize encoded frame data
  * data: H.264 NAL units in AVCC format (length-prefixed)
  * data_len: Length of data

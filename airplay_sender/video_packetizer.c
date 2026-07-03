@@ -24,6 +24,7 @@
 #include "../airplay/crypto/crypto.h"
 #include "../airplay/threads.h"
 #include "video_packetizer.h"
+#include "mirror_crypto.h"
 
 #ifndef htonl
 #include <arpa/inet.h>
@@ -32,6 +33,15 @@
 #define VIDEO_PACKET_HEADER_SIZE 128
 #define AES_KEY_SIZE 16
 #define AES_IV_SIZE 16
+
+// Apple's mirroring protocol stores the frame header timestamp little-endian.
+static void
+put_le64(uint8_t *p, uint64_t v)
+{
+  for (int i = 0; i < 8; i++) {
+    p[i] = (uint8_t)(v >> (8 * i));
+  }
+}
 
 struct video_packetizer_s {
   packetized_data_callback_t callback;
@@ -45,7 +55,34 @@ struct video_packetizer_s {
   uint8_t og[16];        // Stored bytes from previous partial block
   mutex_handle_t packetize_mutex;  // Mutex to serialize packetize calls
   int sps_pps_sent;      // Track if SPS/PPS has been sent (iPad style: send once)
+  // ChaCha20-Poly1305 mode (Apple receivers). When enabled, the whole access
+  // unit is sealed as one packet with a per-frame nonce.
+  int chacha_enabled;
+  uint8_t chacha_key[32];
+  uint64_t chacha_nonce;
+  // Apple receiver frame format (airfry/doubletake): one packet per access unit
+  // (all VCL NALs concatenated in AVCC), little-endian boot-relative NTP
+  // timestamps, codec (SPS/PPS) packet resent before every keyframe. Works with
+  // either AES-CTR (raw pairing) or ChaCha (HAP). Off = PiP's own/loopback
+  // format (per-NAL AES-CTR, big-endian timestamp, codec packet sent once).
+  int apple_format;
+  // Plaintext mode: send the access unit with NO encryption (for receivers that
+  // accept unencrypted mirror video). Uses the Apple per-AU framing.
+  int plaintext_mode;
 };
+
+// Write the frame header timestamp. HAP/ChaCha receivers expect a little-endian
+// raw NTP value; legacy (PiP's own / UxPlay) receivers expect a big-endian NTP
+// fixed-point value (byteutils). The value's meaning is chosen by the sender.
+static void
+pkt_write_ts(video_packetizer_t *pkt, uint8_t *h8, uint64_t ts)
+{
+  if (pkt->apple_format || pkt->chacha_enabled) {
+    put_le64(h8, ts);
+  } else {
+    byteutils_put_ntp_timestamp(h8, 0, ts);
+  }
+}
 
 static int
 convert_annex_b_to_avcc(const uint8_t *annex_b_data, int annex_b_len,
@@ -214,6 +251,38 @@ video_packetizer_set_encryption(video_packetizer_t *pkt,
   return 0;
 }
 
+int
+video_packetizer_set_chacha(video_packetizer_t *pkt, const uint8_t key[32])
+{
+  assert(pkt);
+  assert(key);
+  memcpy(pkt->chacha_key, key, 32);
+  pkt->chacha_nonce = 0;
+  pkt->chacha_enabled = 1;
+  pkt->encryption_initialized = 1; /* satisfies the guard in packetize */
+  fprintf(stderr, "video_packetizer: ChaCha20-Poly1305 enabled, key=%02x%02x%02x%02x...%02x%02x%02x%02x\n",
+          key[0], key[1], key[2], key[3], key[28], key[29], key[30], key[31]);
+  return 0;
+}
+
+void
+video_packetizer_set_apple_format(video_packetizer_t *pkt)
+{
+  assert(pkt);
+  pkt->apple_format = 1;
+  fprintf(stderr, "video_packetizer: Apple frame format (per-AU, LE boot NTP, per-keyframe codec)\n");
+}
+
+void
+video_packetizer_set_plaintext(video_packetizer_t *pkt)
+{
+  assert(pkt);
+  pkt->plaintext_mode = 1;
+  pkt->apple_format = 1;               /* per-AU framing */
+  pkt->encryption_initialized = 1;     /* satisfies the guard in packetize */
+  fprintf(stderr, "video_packetizer: PLAINTEXT video (no encryption, per-AU)\n");
+}
+
 /**
  * Encrypt buffer with partial block handling (matching receiver's mirror_buffer_decrypt behavior)
  * This ensures counter state stays synchronized across packets with partial blocks
@@ -221,35 +290,47 @@ video_packetizer_set_encryption(video_packetizer_t *pkt,
 static void
 encrypt_with_partial_block_handling(video_packetizer_t *pkt, const uint8_t *input, uint8_t *output, int inputLen)
 {
-  // Use stored bytes from previous partial block (if any)
+  int pos = 0;
+
+  // Step 1: XOR the leading bytes against the previous frame's cached trailing-
+  // partial-block keystream. Clamp the count to inputLen (airfry MirrorCipher
+  // step 1): without the clamp, an input shorter than nextEncryptCount reads
+  // past `input` and writes past `output` (heap OOB) and corrupts the counter
+  // accounting. og_start stays based on the full nextEncryptCount.
   if (pkt->nextEncryptCount > 0) {
-    for (int i = 0; i < pkt->nextEncryptCount; i++) {
-      output[i] = (input[i] ^ pkt->og[(16 - pkt->nextEncryptCount) + i]);
+    int n = pkt->nextEncryptCount;
+    if (n > inputLen) {
+      n = inputLen;
     }
+    int og_start = 16 - pkt->nextEncryptCount;
+    for (int i = 0; i < n; i++) {
+      output[i] = (input[i] ^ pkt->og[og_start + i]);
+    }
+    pos = n;
   }
 
-  // Process full blocks
-  int encryptlen = ((inputLen - pkt->nextEncryptCount) / 16) * 16;
+  int remaining = inputLen - pos;
+
+  // Step 2: encrypt full 16-byte blocks from the live CTR stream.
+  int encryptlen = (remaining / 16) * 16;
   if (encryptlen > 0) {
-    // Copy input to output, then encrypt output in place
-    memcpy(output + pkt->nextEncryptCount, input + pkt->nextEncryptCount, encryptlen);
-    AES_CTR_xcrypt_buffer(&pkt->aes_ctx, output + pkt->nextEncryptCount, encryptlen);
+    memcpy(output + pos, input + pos, encryptlen);
+    AES_CTR_xcrypt_buffer(&pkt->aes_ctx, output + pos, encryptlen);
+    pos += encryptlen;
   }
 
-  // Handle remaining partial block
-  int restlen = (inputLen - pkt->nextEncryptCount) % 16;
+  // Step 3: trailing partial block — encrypt a zero-padded full block, emit the
+  // needed bytes, and cache the remainder of the keystream for the next frame.
+  int restlen = remaining % 16;
   pkt->nextEncryptCount = 0;
   if (restlen > 0) {
-    int reststart = inputLen - restlen;
+    int reststart = pos;  // == inputLen - restlen
     memset(pkt->og, 0, 16);
     memcpy(pkt->og, input + reststart, restlen);
-    // Encrypt full 16-byte block (even though we only need restlen bytes)
     AES_CTR_xcrypt_buffer(&pkt->aes_ctx, pkt->og, 16);
-    // Use only the bytes we need
     for (int j = 0; j < restlen; j++) {
       output[reststart + j] = pkt->og[j];
     }
-    // Store unused bytes for next packet
     pkt->nextEncryptCount = 16 - restlen;
   }
 }
@@ -320,14 +401,19 @@ video_packetizer_packetize(video_packetizer_t *pkt,
     avcc_was_allocated = 1;  // Allocated by convert_annex_b_to_avcc
   }
 
-  // Build payload: SPS + PPS (if keyframe and not sent yet - iPad style: send once)
+  // Build payload: SPS + PPS. Legacy/loopback sends it once (iPad style); the
+  // Apple format resends it before every keyframe (matches airfry send_codec_frame).
   int sps_pps_sent_this_call = 0;  // Track if SPS/PPS was sent in this call
-  if (is_keyframe && sps && sps_len > 0 && pps && pps_len > 0 && !pkt->sps_pps_sent) {
-    // Send SPS/PPS as separate packet first (type 0x01)
-    // Receiver expects: 6-byte header, then SPS size (2 bytes BE) at offset 6, SPS data at offset 8,
-    // then PPS size (2 bytes BE) at offset (sps_size + 9), PPS data at offset (sps_size + 11)
-    payload_len = 6 + 2 + sps_len + 2 + pps_len;  // 6-byte header + 2-byte SPS size + SPS + 2-byte PPS size + PPS
-    payload = malloc(payload_len);
+  if (is_keyframe && sps && sps_len > 0 && pps && pps_len > 0 &&
+      (pkt->apple_format || !pkt->sps_pps_sent)) {
+    // Send SPS/PPS as a proper AVCDecoderConfigurationRecord (avcC) codec
+    // packet (type 0x01, unencrypted). The previous version zeroed the first
+    // 6 bytes, producing an invalid avcC that the receiver cannot use to
+    // initialize its H.264 decoder — which is why nothing rendered. Layout
+    // matches doubletake's buildAVCCConfig / iPhone captures.
+    int avcc_config_len = 6 + 2 + sps_len + 1 + 2 + pps_len;
+    payload_len = avcc_config_len + 4;  // + 4-byte trailer (02 00 00 00)
+    payload = calloc(1, payload_len);
     if (!payload) {
       if (avcc_data != data) {
         free(avcc_data);
@@ -337,40 +423,36 @@ video_packetizer_packetize(video_packetizer_t *pkt,
     }
 
     uint8_t *dst = payload;
+    dst[0] = 0x01;                                // configurationVersion
+    dst[1] = (sps_len > 1) ? sps[1] : 0;          // AVCProfileIndication
+    dst[2] = (sps_len > 2) ? sps[2] : 0;          // profile_compatibility
+    dst[3] = (sps_len > 3) ? sps[3] : 0;          // AVCLevelIndication
+    dst[4] = 0xff;                                // 6 bits reserved | lengthSizeMinusOne=3
+    dst[5] = 0xe1;                                // 3 bits reserved | numSPS=1
 
-    // 6-byte header (first 6 bytes, initialized to 0)
-    memset(dst, 0, 6);
-    dst += 6;
-
-    // SPS size (2 bytes, big-endian) at offset 6
+    // SPS size (2 bytes big-endian) + SPS
     uint16_t sps_size_be = htons((uint16_t)sps_len);
-    memcpy(dst, &sps_size_be, 2);
-    dst += 2;
+    memcpy(dst + 6, &sps_size_be, 2);
+    memcpy(dst + 8, sps, sps_len);
 
-    // SPS data at offset 8
-    memcpy(dst, sps, sps_len);
-    dst += sps_len;
-
-    // PPS size (2 bytes, big-endian) at offset (8 + sps_size + 1) = (sps_size + 9)
-    // Need 1 byte gap between SPS data and PPS size
-    dst += 1;
+    int off = 8 + sps_len;
+    dst[off] = 0x01;                              // numPictureParameterSets = 1
     uint16_t pps_size_be = htons((uint16_t)pps_len);
-    memcpy(dst, &pps_size_be, 2);
-    dst += 2;
+    memcpy(dst + off + 1, &pps_size_be, 2);
+    memcpy(dst + off + 3, pps, pps_len);
 
-    // PPS data at offset (8 + sps_size + 3) = (sps_size + 11)
-    memcpy(dst, pps, pps_len);
+    dst[avcc_config_len] = 0x02;                  // 4-byte trailer, rest zero
 
-    // Send SPS/PPS packet
+    // Codec packet header (unencrypted SPS/PPS).
     memset(header, 0, sizeof(header));
     // Receiver expects little-endian payload size (byteutils_get_int reads little-endian)
     uint32_t payload_size_le = (uint32_t)payload_len;
     memcpy(header, &payload_size_le, 4);
-    header[4] = 0x01;  // SPS/PPS packet type
+    header[4] = 0x01;  // SPS/PPS codec packet type
     header[5] = 0x00;
-    header[6] = 0x01;
-    header[7] = 0x16;
-    byteutils_put_ntp_timestamp(header, 8, ntp_timestamp);
+    header[6] = 0x16;  // h264 SPS+PPS option (was incorrectly 0x01)
+    header[7] = 0x01;  // (was incorrectly 0x16)
+    pkt_write_ts(pkt, header + 8, ntp_timestamp);
 
     if (pkt->callback) {
       // Allocate packet buffer
@@ -411,6 +493,21 @@ video_packetizer_packetize(video_packetizer_t *pkt,
   int nal_packet_count = 0;
   int is_first_video_packet = 1;  // Track if this is the first video packet after SPS/PPS
 
+  // Apple format accumulates the whole access unit (all kept NALs in AVCC form)
+  // and sends it as ONE packet after the loop (encrypted with ChaCha or AES-CTR).
+  // The PiP/loopback format sends each NAL as its own AES-CTR packet.
+  int per_au = pkt->apple_format;
+  uint8_t *au_buf = NULL;
+  int au_len = 0;
+  if (per_au) {
+    au_buf = malloc(avcc_len > 0 ? (size_t)avcc_len : 1);
+    if (!au_buf) {
+      if (avcc_was_allocated) free(avcc_data);
+      MUTEX_UNLOCK(pkt->packetize_mutex);
+      return -1;
+    }
+  }
+
   while (pos < avcc_len) {
     if (pos + 4 > avcc_len) {
       // Not enough data for NAL length
@@ -440,6 +537,22 @@ video_packetizer_packetize(video_packetizer_t *pkt,
     // Skip SEI (type 6) NALs - iPad doesn't send them (matching iPad style)
     if (nal_type == 6) {
       pos += 4 + nal_len;
+      continue;
+    }
+
+    // Apple format: only VCL slices (NAL types 1-5) belong in the access unit,
+    // matching airfry (AUD/SEI/SPS/PPS/filler are dropped from the AU). Feeding
+    // non-VCL NALs would make the receiver's frame parser diverge.
+    if (per_au && (nal_type < 1 || nal_type > 5)) {
+      pos += 4 + nal_len;
+      continue;
+    }
+    // Apple format: accumulate this NAL (with its 4-byte length) into the AU.
+    if (per_au) {
+      memcpy(au_buf + au_len, avcc_data + pos, 4 + nal_len);
+      au_len += 4 + nal_len;
+      pos += 4 + nal_len;
+      nal_packet_count++;
       continue;
     }
 
@@ -496,18 +609,15 @@ video_packetizer_packetize(video_packetizer_t *pkt,
     memcpy(header, &payload_size_le, 4);
     header[4] = 0x00;  // Encrypted video packet
 
-    // Set packet[5] = 0x10 if this is the first video packet after SPS/PPS (keyframe)
-    // Otherwise use 0x00 for regular encrypted packets
-    // Note: Only set 0x10 if SPS/PPS was just sent in this call (iPad style)
-    if (is_first_video_packet && is_keyframe && sps_pps_sent_this_call) {
-      header[5] = 0x10;  // First encrypted packet after SPS/PPS
-      is_first_video_packet = 0;
-    } else {
-      header[5] = 0x00;  // Regular encrypted packet
-    }
+    // IDR indicator: set 0x10 on every keyframe's encrypted VCL packet (matches
+    // doubletake/Apple). The old code only set it on the very first packet after
+    // SPS/PPS, so later keyframes were mislabeled as non-IDR.
+    (void)is_first_video_packet;
+    (void)sps_pps_sent_this_call;
+    header[5] = is_keyframe ? 0x10 : 0x00;
     header[6] = 0x00;
     header[7] = 0x00;
-    byteutils_put_ntp_timestamp(header, 8, ntp_timestamp);
+    pkt_write_ts(pkt, header + 8, ntp_timestamp);
 
     if (packetize_count == 0 || packetize_count % 30 == 0) {
       fprintf(stderr, "video_packetizer: sending NAL %d (type=%d), header[5]=0x%02x, ntp_timestamp=%" PRIu64 "\n",
@@ -549,6 +659,59 @@ video_packetizer_packetize(video_packetizer_t *pkt,
     pos += 4 + nal_len;
     nal_packet_count++;
   }
+
+  // Apple format: send the accumulated access unit as ONE packet, encrypted with
+  // ChaCha20-Poly1305 (HAP) or AES-128-CTR (raw pairing). Matches airfry send_frame.
+  if (per_au && au_len > 0 && pkt->callback) {
+    int overhead = pkt->chacha_enabled ? 16 : 0;   // Poly1305 tag (ChaCha only)
+    int payload_len2 = au_len + overhead;
+    total_packet_len = VIDEO_PACKET_HEADER_SIZE + payload_len2;
+    if (pkt->packet_buffer_size < total_packet_len) {
+      uint8_t *nb = realloc(pkt->packet_buffer, total_packet_len);
+      if (!nb) {
+        free(au_buf);
+        if (avcc_was_allocated) free(avcc_data);
+        MUTEX_UNLOCK(pkt->packetize_mutex);
+        return -1;
+      }
+      pkt->packet_buffer = nb;
+      pkt->packet_buffer_size = total_packet_len;
+    }
+
+    uint8_t *hdr = pkt->packet_buffer;
+    memset(hdr, 0, VIDEO_PACKET_HEADER_SIZE);
+    uint32_t size_le = (uint32_t)payload_len2;  // header size includes the ChaCha tag
+    memcpy(hdr, &size_le, 4);
+    hdr[4] = 0x00;                        // encrypted video
+    hdr[5] = is_keyframe ? 0x10 : 0x00;   // IDR flag
+    hdr[6] = 0x00;
+    hdr[7] = 0x00;
+    pkt_write_ts(pkt, hdr + 8, ntp_timestamp);
+
+    if (pkt->plaintext_mode) {
+      // No encryption: copy the access unit verbatim.
+      memcpy(hdr + VIDEO_PACKET_HEADER_SIZE, au_buf, (size_t)au_len);
+    } else if (pkt->chacha_enabled) {
+      // nonce = 4 zero bytes || LE64(per-frame counter); AAD = the 128-byte header.
+      uint8_t nonce[12];
+      memset(nonce, 0, sizeof(nonce));
+      for (int i = 0; i < 8; i++) nonce[4 + i] = (uint8_t)(pkt->chacha_nonce >> (8 * i));
+      chacha20poly1305_seal(pkt->chacha_key, nonce, hdr, VIDEO_PACKET_HEADER_SIZE,
+                            au_buf, (size_t)au_len, hdr + VIDEO_PACKET_HEADER_SIZE);
+      pkt->chacha_nonce++;
+    } else {
+      // AES-128-CTR over the whole access unit with the receiver's block-alignment
+      // scheme (continuous CTR + cached trailing-partial keystream across AUs).
+      encrypt_with_partial_block_handling(pkt, au_buf, hdr + VIDEO_PACKET_HEADER_SIZE, au_len);
+    }
+
+    if (packetize_count == 0 || packetize_count % 30 == 0) {
+      fprintf(stderr, "video_packetizer: apple-format AU cipher=%s au_len=%d payload=%d keyframe=%d ts=%" PRIu64 "\n",
+              pkt->chacha_enabled ? "chacha" : "aes-ctr", au_len, payload_len2, is_keyframe, ntp_timestamp);
+    }
+    pkt->callback(pkt->packet_buffer, total_packet_len, pkt->callback_ctx);
+  }
+  if (au_buf) free(au_buf);
 
   // Free AVCC data if we allocated it
   if (avcc_was_allocated) {

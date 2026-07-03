@@ -1,0 +1,8 @@
+# Apple's proprietary FairPlay snapshot — NEVER commit this. It is regenerated
+# at build time by extract_blob.py from the doubletake submodule.
+fp_blob.bin
+
+# Test binaries
+test_fpemu
+test_fpemu_asan
+*.dSYM/
