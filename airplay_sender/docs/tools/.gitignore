@@ -1,0 +1,6 @@
+# receiver-derived / large assets needed by moto_fairplay.py (regenerate via fp_snapshot.js)
+*.so
+snap_*.bin
+snap_base.txt
+*.pyc
+__pycache__/

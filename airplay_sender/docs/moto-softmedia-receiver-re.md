@@ -190,23 +190,54 @@ Tooling lives in [`tools/`](tools/): `fp_hook.js` (the capture hook), `fp_run.py
 
 ---
 
-## 5. What this means for PiP
+## 5. Running the receiver's FairPlay offline (the oracle)
 
 Every step of the receiver's key schedule is standard AirPlay **except** `ekey → aes_key`
-(the context-dependent dense-ekey FairPlay whitebox `FUN_005c9ebc` → `FUN_0064dfdc`). Given a
-correct `aes_key`, PiP already has everything else (it chooses `streamConnectionID`, and the KDF is
-plain SHA-512). So encrypted mirroring to this receiver reduces to reproducing that one unwrap.
+(the context-dependent dense-ekey FairPlay whitebox). The whitebox is deliberately un-reversible,
+so instead of re-deriving it we **run the receiver's own code** — the same idea PiP already uses in
+[`fpemu/`](../fpemu) to run Apple's blob for m3.
 
-Viable paths (not yet implemented — `PIP_NOENC` remains the shipped solution for the Moto):
+[`tools/moto_fairplay.py`](tools/moto_fairplay.py) does this in Unicorn and reproduces the entire
+FairPlay exchange **byte-for-byte** against the live device:
 
-- **Read-once & hardcode (device-specific):** make PiP use fixed fp-setup nonces + a fixed ekey so
-  the receiver's `aes_key` is deterministic; hook the receiver once (§4) to read that `aes_key`,
-  bake it in, and have PiP compute `video_key` via the KDF. Works only for this patched Moto.
-- **Emulate the unwrap (general):** run `FUN_005c9ebc`/`FUN_0064dfdc` (with the 276-byte fp-setup
-  context, itself derivable by emulating the fp-setup handler over the m1–m4 messages) in a CPU
-  emulator (Unicorn) — the same idea PiP already uses in `fpemu/` to run Apple's FairPlay for m3 —
-  so PiP can compute `aes_key` for any ekey it sends. Portable but heavy.
-- **PIP_NOENC:** sidestep FairPlay entirely; the receiver accepts unencrypted per-AU H.264. Shipped.
+```
+MotoFairPlay.derive(ctx0, m1, m3, ekey) -> (m2, m4, aes_key)
+```
+
+- init fp_ctx (`ctx0`) → `FUN_005c9b08(m1)` → **m2** → `FUN_005c9b08(m3)` → **m4** → the 276-byte
+  `context276` is built in the fp_ctx → `FUN_005c9ebc(ekey)` → **aes_key**. All validated equal to
+  the receiver's real m2/m4/aes_key, across sessions.
+
+### The harness recipe (what makes it work)
+
+1. **Map** `libAirReceiver.so` at the **snapshot's base** so the snapshot's absolute pointers stay
+   valid; apply `R_AARCH64_RELATIVE` relocations for code-referenced data.
+2. **Overlay a PRE-handshake `.data/.bss` snapshot.** The whitebox's key-material tables are computed
+   at init (not in the file), so a live snapshot is required. It MUST be captured **before** the
+   handshake (at the first `FUN_005c9b08` call): the handshake mutates global state m1→m3, so a
+   post-m3 snapshot corrupts a re-run. The snapshot is session-independent — capture once, reuse.
+3. **Re-point import GOT slots at Python stubs** (`malloc`/`memcpy`/`memset`/`pthread_*`) *after* the
+   overlay (the snapshot holds live-libc addresses that would otherwise win).
+4. **Neutralize the anti-tamper check woven into the unwrap:** `FUN_0057ce38` (the checker-singleton
+   getter) returns a live-heap object we don't have — intercept it and return a fake object whose
+   vtable entries all `ret 0` (untampered).
+5. Set `TPIDR_EL0` + a stack canary; the same fp_ctx object flows through handshake and unwrap.
+
+Performance: ~10 s/call in Python-Unicorn (range-scope the code hooks to the stub/checker addresses,
+not per-instruction — that alone is an 8× speedup). Native execution on Apple-Silicon would be ~ms.
+
+### Turning this into encrypted PiP mirroring
+
+The fix in [`../fairplay_client.c`](../fairplay_client.c) is surgical: for the SoftMedia receiver,
+replace `playfair_decrypt(m3, ekey)` with `MotoFairPlay.derive(...)→aes_key` using the *same* m1/m3
+PiP sends. Both sides then compute the identical `aes_key`; PiP derives `video_key` via the SHA-512
+KDF (§1) and encrypts. Three ways to ship it, not yet wired in (`PIP_NOENC` remains the default):
+
+- **Hardcode** — the handshake is deterministic (no `rand`), so fixed `m1`/`m3`/`ekey` → fixed
+  `aes_key`; precompute once and bake in. Trivial runtime; tied to this `.so` version.
+- **Native arm64 runtime** — load the `.so` and call its FairPlay natively on Apple-Silicon
+  (Unicorn as x86 fallback). Fast + general; needs a mach-o-style loader + the base-map solved.
+- **Embedded Unicorn** — bundle Unicorn + port the harness to C. General; ~seconds/connect.
 
 ---
 
@@ -214,10 +245,15 @@ Viable paths (not yet implemented — `PIP_NOENC` remains the shipped solution f
 
 | file | purpose |
 |---|---|
-| [`tools/fp_hook.js`](tools/fp_hook.js) | frida hook: SETUP fields, FairPlay unwrap (ekey→aes_key + 276B ctx), SHA/AES key set, CTR key, streamConnectionID |
-| [`tools/fp_run.py`](tools/fp_run.py) | frida runner: attach to the gadget on 127.0.0.1:27042, load the hook, liveness ping |
+| [`tools/moto_fairplay.py`](tools/moto_fairplay.py) | **the oracle** — runs the receiver's FairPlay offline in Unicorn; `derive(ctx0,m1,m3,ekey)→(m2,m4,aes_key)` |
+| [`tools/fp_snapshot.js`](tools/fp_snapshot.js) | frida hook: capture the PRE-handshake `.data/.bss`, `ctx0`, m1/m2/m3/m4, ekey, aes_key in one session |
+| [`tools/fp_snaprun.py`](tools/fp_snaprun.py) | runner for `fp_snapshot.js` — saves the snapshot blobs to `snap_*.bin` |
+| [`tools/fp_hook.js`](tools/fp_hook.js) | frida hook: SETUP fields, unwrap (ekey→aes_key + 276B ctx), SHA/AES key set, CTR key, streamConnectionID |
+| [`tools/fp_run.py`](tools/fp_run.py) | frida runner: attach to the gadget on 127.0.0.1:27042, load a hook, liveness ping |
 | [`tools/patch_libairreceiver.py`](tools/patch_libairreceiver.py) | patch `libAirReceiver.so`: tamper bypass (0x47cf84→ret) + `DT_HASH`→`DT_NEEDED(ffmpeg.so)` |
 | [`tools/axml_extractnativelibs.py`](tools/axml_extractnativelibs.py) | flip `extractNativeLibs`→true in the binary `AndroidManifest.xml` |
 
-No Apple proprietary material (e.g. `fp_blob.bin`) is included here; the tools operate only on the
-third-party receiver binary for interoperability analysis.
+**Assets (not committed — third-party / large):** the oracle needs `libAirReceiver.so` (from the
+APK) and the captured `snap_rw1.bin`/`snap_rw2.bin` pre-handshake snapshot + `snap_ctx0.bin`. These
+are `.gitignore`d like PiP's `fpemu/fp_blob.bin`; regenerate them with `fp_snapshot.js` + the recipe
+above. No Apple proprietary material is included here.
