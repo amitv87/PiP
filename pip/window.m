@@ -14,6 +14,7 @@
 #import "HLSPlayer.h"
 #import <AVFoundation/AVFoundation.h>
 #import <CoreImage/CoreImage.h>
+#include <dlfcn.h>
 #ifndef NO_AIRPLAY
 #import "airplaySender.h"
 #include "../airplay_sender/http_client.h"
@@ -326,6 +327,31 @@ static void bringWindowToForegroundModern(CGWindowID wid){
   CFRelease(appRef);
 }
 
+// CGWindowListCreateImage / CGDisplayCreateImage / CGDisplayStream* were marked
+// unavailable in the macOS 15 SDK ("use ScreenCaptureKit"), but the symbols are
+// still shipped in the CoreGraphics dylib for our macOS 11 deployment target.
+// Resolve them at runtime so we keep identical behaviour on every OS that still
+// provides them while compiling against the newer SDK.
+static void* pip_cg_sym(const char* name){
+  static void* handle;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    handle = dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", RTLD_LAZY);
+  });
+  return handle ? dlsym(handle, name) : NULL;
+}
+
+static CFStringRef pip_cg_const(const char* name){
+  CFStringRef* ptr = (CFStringRef*)pip_cg_sym(name);
+  return ptr ? *ptr : NULL;
+}
+
+typedef CGImageRef (*pip_CGWindowListCreateImage)(CGRect, CGWindowListOption, CGWindowID, CGWindowImageOption);
+typedef CGImageRef (*pip_CGDisplayCreateImage)(CGDirectDisplayID);
+typedef CGDisplayStreamRef (*pip_CGDisplayStreamCreateWithDispatchQueue)(CGDirectDisplayID, size_t, size_t, int32_t, CFDictionaryRef, dispatch_queue_t, CGDisplayStreamFrameAvailableHandler);
+typedef CGError (*pip_CGDisplayStreamStart)(CGDisplayStreamRef);
+typedef CGError (*pip_CGDisplayStreamStop)(CGDisplayStreamRef);
+
 static CGImageRef CaptureWindow(CGWindowID wid, bool hidpi){
   CGImageRef window_image = NULL;
   CFArrayRef window_image_arr = NULL;
@@ -334,7 +360,10 @@ static CGImageRef CaptureWindow(CGWindowID wid, bool hidpi){
     | (hidpi ? 0 : kCGSWindowCaptureNominalResolution)
   );
   if(window_image_arr) window_image = (CGImageRef)CFArrayGetValueAtIndex(window_image_arr, 0);
-  if(!window_image) window_image = CGWindowListCreateImage(CGRectNull, kCGWindowListOptionIncludingWindow, wid, kCGWindowImageNominalResolution | kCGWindowImageBoundsIgnoreFraming);
+  if(!window_image){
+    pip_CGWindowListCreateImage createImage = (pip_CGWindowListCreateImage)pip_cg_sym("CGWindowListCreateImage");
+    if(createImage) window_image = createImage(CGRectNull, kCGWindowListOptionIncludingWindow, wid, kCGWindowImageNominalResolution | kCGWindowImageBoundsIgnoreFraming);
+  }
   return window_image;
 }
 
@@ -1637,7 +1666,12 @@ static NSImage* hls_button_image(NSImage* img){
 #endif
 
   // Use legacy methods for older macOS or when ScreenCaptureKit is unavailable
-  CGImageRef window_image = window_id >= 0 ? CaptureWindow(window_id, is_hidpi) : (display_id >= 0 ? CGDisplayCreateImage(display_id) : NULL);
+  CGImageRef window_image = NULL;
+  if(window_id >= 0) window_image = CaptureWindow(window_id, is_hidpi);
+  else if(display_id >= 0){
+    pip_CGDisplayCreateImage createImage = (pip_CGDisplayCreateImage)pip_cg_sym("CGDisplayCreateImage");
+    if(createImage) window_image = createImage(display_id);
+  }
   if(window_image != NULL){
     CIImage* ciimage = [CIImage imageWithCGImage:window_image];
     CGRect imageRect = [ciimage extent];
@@ -2030,7 +2064,8 @@ end:
 
 -(void)stopDisplayStream{
   if(!display_stream) return;
-  CGDisplayStreamStop(display_stream);
+  pip_CGDisplayStreamStop stopStream = (pip_CGDisplayStreamStop)pip_cg_sym("CGDisplayStreamStop");
+  if(stopStream) stopStream(display_stream);
   CFRelease(display_stream);
   display_stream = NULL;
 }
@@ -2305,16 +2340,19 @@ end:
     size_t height = CGDisplayPixelsHigh(display_id);
     if(is_hidpi) width *= self.backingScaleFactor, height *= self.backingScaleFactor;
 
-    NSDictionary* opts = @{
-      (__bridge NSString *)kCGDisplayStreamMinimumFrameTime : @(1.0f / refreshRate),
-      (__bridge NSString *)kCGDisplayStreamShowCursor : [(NSNumber*)getPref(@"mouse_capture") intValue] > 0 ? @YES : @NO,
-    };
+    NSMutableDictionary* opts = [NSMutableDictionary dictionary];
+    CFStringRef minFrameTimeKey = pip_cg_const("kCGDisplayStreamMinimumFrameTime");
+    CFStringRef showCursorKey = pip_cg_const("kCGDisplayStreamShowCursor");
+    if(minFrameTimeKey) opts[(__bridge NSString *)minFrameTimeKey] = @(1.0f / refreshRate);
+    if(showCursorKey) opts[(__bridge NSString *)showCursorKey] = [(NSNumber*)getPref(@"mouse_capture") intValue] > 0 ? @YES : @NO;
 
-    display_stream = CGDisplayStreamCreateWithDispatchQueue(display_id, width, height, kCVPixelFormatType_32BGRA,  (__bridge CFDictionaryRef)opts, dispatch_get_main_queue(), ^(CGDisplayStreamFrameStatus status, uint64_t displayTime, IOSurfaceRef frameSurface, CGDisplayStreamUpdateRef updateRef) {
+    pip_CGDisplayStreamCreateWithDispatchQueue createStream = (pip_CGDisplayStreamCreateWithDispatchQueue)pip_cg_sym("CGDisplayStreamCreateWithDispatchQueue");
+    if(createStream) display_stream = createStream(display_id, width, height, kCVPixelFormatType_32BGRA,  (__bridge CFDictionaryRef)opts, dispatch_get_main_queue(), ^(CGDisplayStreamFrameStatus status, uint64_t displayTime, IOSurfaceRef frameSurface, CGDisplayStreamUpdateRef updateRef) {
       if(status != kCGDisplayStreamFrameStatusFrameComplete || !self->is_playing || self->isWinClosing) return;
       [self->imageView setImage:[CIImage imageWithIOSurface:frameSurface]];
     });
-    CGDisplayStreamStart(display_stream);
+    pip_CGDisplayStreamStart startStream = (pip_CGDisplayStreamStart)pip_cg_sym("CGDisplayStreamStart");
+    if(startStream && display_stream) startStream(display_stream);
 
     is_playing = true;
     [self resetPlaybackSate];
