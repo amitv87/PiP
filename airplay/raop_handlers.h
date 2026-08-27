@@ -465,7 +465,7 @@ raop_handler_setup(raop_conn_t *conn,
 
         bool old_protocol = false;
 #ifdef OLD_PROTOCOL_CLIENT_USER_AGENT_LIST    /* set in global.h */
-        if (strstr(OLD_PROTOCOL_CLIENT_USER_AGENT_LIST, user_agent)) old_protocol = true;
+        if (user_agent && strstr(OLD_PROTOCOL_CLIENT_USER_AGENT_LIST, user_agent)) old_protocol = true;
 #endif
         if  (old_protocol) {    /* some windows AirPlay-client emulators use old AirPlay 1 protocol with unhashed AES key */
             logger_log(conn->raop->logger, LOGGER_INFO, "Client identifed as using old protocol (unhashed) AES audio key)");
@@ -638,7 +638,7 @@ raop_handler_get_parameter(raop_conn_t *conn,
 
     content_type = http_request_get_header(request, "Content-Type");
     data = http_request_get_data(request, &datalen);
-    if (!strcmp(content_type, "text/parameters")) {
+    if (content_type && !strcmp(content_type, "text/parameters")) {
         const char *current = data;
 
         while (current && (datalen - (current - data) > 0)) {
@@ -684,7 +684,7 @@ raop_handler_set_parameter(raop_conn_t *conn,
 
     content_type = http_request_get_header(request, "Content-Type");
     data = http_request_get_data(request, &datalen);
-    if (!strcmp(content_type, "text/parameters")) {
+    if (content_type && !strcmp(content_type, "text/parameters")) {
         char *datastr;
         datastr = calloc(1, datalen+1);
         if (data && datastr && conn->raop_rtp) {
