@@ -7,7 +7,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET 11.0)
 
 project(PiP)
 
-add_compile_options(-fobjc-arc -Wno-deprecated-declarations -Wno-format)
+add_compile_options(-fobjc-arc -Wno-deprecated-declarations -Wno-format -mmacosx-version-min=14.0)
 
 set(frameworks AVFoundation Cocoa VideoToolbox AudioToolbox CoreMedia QuartzCore OpenGL Metal MetalKit PIP SkyLight ScreenCaptureKit)
 list(TRANSFORM frameworks PREPEND "-framework ")

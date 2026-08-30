@@ -18,6 +18,10 @@ typedef enum{
 NSObject* getPref(NSString* key);
 NSObject* getPrefOption(NSString* key);
 void setPref(NSString* key, NSObject* val);
+NSArray* getDisplayList(void);
+NSString* getDisplayNameForId(CGDirectDisplayID displayId);
+void setCustomDisplayName(CGDirectDisplayID displayId, NSString* name);
+void showDisplayNamesPanel(void);
 
 @interface Preferences : NSPanel<NSWindowDelegate, NSTableViewDelegate, NSTableViewDataSource>
 
